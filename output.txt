@@ -1,0 +1,1496 @@
+--- Start of content from ./config.py ---
+
+
+# wplace_bot/config.py
+import threading
+
+import numpy as np
+
+# --- General Configuration ---
+LOG_FILE = "wplace_painter.log"
+PROFILE_DATA_FILE = "profile_data.json"
+DATA_LOCK = threading.Lock()
+
+
+# --- New Manager Configuration ---
+# Interval for the manager's background thread to check a random template.
+RANDOM_TILE_CHECK_INTERVAL_SECONDS = 60
+
+# --- Charge Burning Strategy ---
+# Select the strategy for burning excess charges.
+# Set to None to disable strategic burning and fall back to random transparent pixels.
+BURN_STRATEGY = "enclosed_component"  # or None
+
+# Configuration for specific strategies.
+BURN_STRATEGY_CONFIG = {
+    "enclosed_component": {
+        "tile_x": 1188,
+        "tile_y": 720,
+        "color_id": 27,  # Corresponds to "Dark Pink"
+    }
+    # "another_strategy": { "some_param": "some_value" }
+}
+
+
+# --- wplace.live Constants ---
+COLOR_PALETTE_JSON = [
+  {"name": "Transparent", "rgb": [0, 0, 0]},
+  {"name": "Black", "rgb": [0, 0, 0]},{"name": "Dark Gray", "rgb": [60, 60, 60]},
+  {"name": "Gray", "rgb": [120, 120, 120]},{"name": "Light Gray", "rgb": [210, 210, 210]},
+  {"name": "White", "rgb": [255, 255, 255]},{"name": "Deep Red", "rgb": [96, 0, 24]},
+  {"name": "Red", "rgb": [237, 28, 36]},{"name": "Orange", "rgb": [255, 127, 39]},
+  {"name": "Gold", "rgb": [246, 170, 9]},{"name": "Yellow", "rgb": [249, 221, 59]},
+  {"name": "Light Yellow", "rgb": [255, 250, 188]},{"name": "Dark Green", "rgb": [14, 185, 104]},
+  {"name": "Green", "rgb": [19, 230, 123]},{"name": "Light Green", "rgb": [135, 255, 94]},
+  {"name": "Dark Teal", "rgb": [12, 129, 110]},{"name": "Teal", "rgb": [16, 174, 166]},
+  {"name": "Light Teal", "rgb": [19, 225, 190]},{"name": "Dark Blue", "rgb": [40, 80, 158]},
+  {"name": "Blue", "rgb": [64, 147, 228]},{"name": "Cyan", "rgb": [96, 247, 242]},
+  {"name": "Indigo", "rgb": [107, 80, 246]},{"name": "Light Indigo", "rgb": [153, 177, 251]},
+  {"name": "Dark Purple", "rgb": [120, 12, 153]},{"name": "Purple", "rgb": [170, 56, 185]},
+  {"name": "Light Purple", "rgb": [224, 159, 249]},{"name": "Dark Pink", "rgb": [203, 0, 122]},
+  {"name": "Pink", "rgb": [236, 31, 128]},{"name": "Light Pink", "rgb": [243, 141, 169]},
+  {"name": "Dark Brown", "rgb": [104, 70, 52]},{"name": "Brown", "rgb": [149, 104, 42]},
+  {"name": "Beige", "rgb": [248, 178, 119]},{"name": "Medium Gray", "rgb": [170, 170, 170]},
+  {"name": "Dark Red", "rgb": [165, 14, 30]},{"name": "Light Red", "rgb": [250, 128, 114]},
+  {"name": "Dark Orange", "rgb": [228, 92, 26]},{"name": "Light Tan", "rgb": [214, 181, 148]},
+  {"name": "Dark Goldenrod", "rgb": [156, 132, 49]},{"name": "Goldenrod", "rgb": [197, 173, 49]},
+  {"name": "Light Goldenrod", "rgb": [232, 212, 95]},{"name": "Dark Olive", "rgb": [74, 107, 58]},
+  {"name": "Olive", "rgb": [90, 148, 74]},{"name": "Light Olive", "rgb": [132, 197, 115]},
+  {"name": "Dark Cyan", "rgb": [15, 121, 159]},{"name": "Light Cyan", "rgb": [187, 250, 242]},
+  {"name": "Light Blue", "rgb": [125, 199, 255]},{"name": "Dark Indigo", "rgb": [77, 49, 184]},
+  {"name": "Dark Slate Blue", "rgb": [74, 66, 132]},{"name": "Slate Blue", "rgb": [122, 113, 196]},
+  {"name": "Light Slate Blue", "rgb": [181, 174, 241]},{"name": "Light Brown", "rgb": [219, 164, 99]},
+  {"name": "Dark Beige", "rgb": [209, 128, 81]},{"name": "Light Beige", "rgb": [255, 197, 165]},
+  {"name": "Dark Peach", "rgb": [155, 82, 73]},{"name": "Peach", "rgb": [209, 128, 120]},
+  {"name": "Light Peach", "rgb": [250, 182, 164]},{"name": "Dark Tan", "rgb": [123, 99, 82]},
+  {"name": "Tan", "rgb": [156, 132, 107]},{"name": "Dark Slate", "rgb": [51, 57, 65]},
+  {"name": "Slate", "rgb": [109, 117, 141]},{"name": "Light Slate", "rgb": [179, 185, 209]},
+  {"name": "Dark Stone", "rgb": [109, 100, 63]},{"name": "Stone", "rgb": [148, 140, 107]},
+  {"name": "Light Stone", "rgb": [205, 197, 158]}
+]
+COLOR_PALETTE = [c['rgb'] for c in COLOR_PALETTE_JSON]
+FULL_PALETTE_NP = np.array(COLOR_PALETTE, dtype=np.uint8)
+
+
+# --- Profile Manager Configuration ---
+# Folder where your Chrome profiles are stored.
+PROFILES_FOLDER = "./Profiles"
+# Directory to scan for .png templates.
+TEMPLATE_DIRECTORY = "templates"
+
+# List the names of the profile folders you want to run via the manager.
+PROFILES_TO_USE = [
+    "Profile 10",
+    "Profile 9", 
+    "Profile 8", 
+    "Profile 7", 
+    "Profile 6", 
+    "Profile 5",
+    "Profile 4", 
+    "Profile 3", 
+    "Profile 2",
+    "Profile 1"
+]
+
+CHARGE_GAIN_RATE_SECONDS = 30  # 1 charge every 30 seconds
+PROFILE_TIMEOUT_SECONDS = 120  # Max runtime for a single profile
+RUN_INTERVAL_SECONDS = 300     # Time to wait between running profiles
+IDLE_CHECK_INTERVAL_SECONDS = 60  # Wait time when no profiles are ready
+
+--- End of content from ./config.py ---
+
+--- Start of content from ./painter.py ---
+
+
+import asyncio
+import base64
+import json
+import logging
+import random
+import io
+from collections import defaultdict
+from pathlib import Path
+import re
+from typing import Dict, List, Tuple, Set, Any
+
+
+
+
+import numpy as np
+import zendriver as zd
+from PIL import Image
+from zendriver import cdp
+
+from wplace_bot.analysis.human_placer import get_human_like_ordered_pixels
+from wplace_bot.utils.color_helper import find_color_ids_with_alpha
+from wplace_bot.config import (
+    COLOR_PALETTE, COLOR_PALETTE_JSON,
+)
+
+logging.basicConfig(
+    filename='wplace_painter.log',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    filemode='w'
+)
+
+class BrowserInteractionError(Exception):
+    """Custom exception for critical browser failures that should terminate the session."""
+    pass
+
+
+def find_closing_brace(text: str, start_index: int) -> int:
+    """
+    Given a text and the index of an opening brace '{', finds the index of the 
+    corresponding closing brace '}'. Returns -1 if not found.
+    """
+    if text[start_index] != '{':
+        return -1
+        
+    brace_level = 1
+    for i in range(start_index + 1, len(text)):
+        char = text[i]
+        if char == '{':
+            brace_level += 1
+        elif char == '}':
+            brace_level -= 1
+            if brace_level == 0:
+                return i
+    return -1
+
+def expose_paint_function(body_str: str) -> tuple[str, str | None]:
+    """
+    Dynamically and safely finds the paint function, its class, and its instance,
+    then injects code to expose it on the window object.
+    
+    Args:
+        body_str (str): The string containing the minified JavaScript code.
+        
+    Returns:
+        tuple[str, str | None]: A tuple containing:
+            - The modified (or original) JavaScript code as a string.
+            - The found paint function's name, or None if not found.
+    """
+    # Step 1: Find our anchor - the `paint` function containing the unique token.
+    paint_func_regex = re.compile(r'(async\s+paint)\s*\([^)]*\)\s*{[\s\S]*?"x-pawtect-token"')
+    paint_match = paint_func_regex.search(body_str)
+
+    if not paint_match:
+        return body_str, None
+
+    paint_start_index = paint_match.start()
+    paint_func_name_from_match = "paint" # We are matching the literal name 'paint'
+    logging.debug(f"[+] Found anchor 'paint' function at index {paint_start_index}.")
+
+    # Step 2: Work backwards to find candidate classes.
+    class_def_regex = re.compile(r'class\s+([a-zA-Z0-9_$]+)\s*{')
+    preceding_code = body_str[:paint_start_index]
+    candidate_classes = list(class_def_regex.finditer(preceding_code))
+
+    if not candidate_classes:
+        logging.error("[-] No preceding 'class' definitions found before the anchor function.")
+        return body_str, None
+
+    found_class_name = None
+    for class_candidate in reversed(candidate_classes):
+        class_name = class_candidate.group(1)
+        class_open_brace_index = class_candidate.end(0) - 1
+        
+        # Step 3: Verify Scope.
+        class_close_brace_index = find_closing_brace(body_str, class_open_brace_index)
+        if class_close_brace_index != -1 and paint_start_index > class_open_brace_index and paint_start_index < class_close_brace_index:
+            logging.debug(f"[+] VERIFIED: 'paint' function is inside class '{class_name}'.")
+            found_class_name = class_name
+            break
+
+    if not found_class_name:
+        logging.error("[-] FAILED: Could not verify the parent class for the 'paint' function.")
+        return body_str, None
+
+    # Step 4: Find where this confirmed class is instantiated.
+    instance_regex = re.compile(
+        r"(?:let|var|const)\s+([a-zA-Z0-9_$]+)\s*=\s*new\s+" + re.escape(found_class_name) + r"\s*\([^)]*\);"
+    )
+    instance_match = instance_regex.search(body_str)
+
+    if not instance_match:
+        logging.error(f"[-] Found class '{found_class_name}', but could not find where it was instantiated.")
+        return body_str, None
+
+    instance_name = instance_match.group(1)
+    full_instantiation_line = instance_match.group(0)
+    logging.debug(f"[+] Found class instance variable: '{instance_name}'")
+
+    # Step 5: Inject the binding code safely after the instantiation line.
+    injection_code = f"window.exposedPaintFunction = {instance_name}.paint.bind({instance_name});"
+    replacement_block = f"{full_instantiation_line}\n{injection_code}"
+    
+    modified_body_str = body_str.replace(full_instantiation_line, replacement_block, 1)
+
+    logging.info(f"[+] Exposed paint function '{instance_name}.paint' as 'window.exposedPaintFunction'")
+    
+    return modified_body_str, paint_func_name_from_match
+
+class WplacePainter:
+    """
+    Manages browser automation, user state, and network interactions with wplace.live.
+    """
+    def __init__(self, pixel_queue: List[Tuple[float, int, int, int]], transparent_pixels: List[Tuple[int, int]], burn_candidates: List[Tuple[int, int]]):
+        """
+        Initializes the painter with pre-analyzed pixel data.
+
+        Args:
+            pixel_queue: A list of (priority, gx, gy, color_id) tuples to paint.
+            transparent_pixels: A list of (gx, gy) tuples representing available transparent pixels.
+            burn_candidates: A list of (gx, gy) tuples for strategic charge burning.
+        """
+        self.paint_token: str | None = None
+        self.browser: zd.Browser | None = None
+        self.page: zd.Tab | None = None
+        self.user_data: Dict[str, Any] | None = None
+        self.current_charges: int = 0
+        self.max_charges: int = 0
+        self.droplets: int = 0
+        self.available_colors: Set[int] = set()
+        self.fingerprint_func_name: str | None = None
+
+
+        # --- Data from external analysis ---
+        self.pixel_queue = pixel_queue
+        self.available_transparent_pixels = transparent_pixels
+        self.burn_candidates = burn_candidates
+
+    async def setup_browser(self, profile_dir: Path) -> tuple[str | None, str | None, str | None]:
+        """
+        Starts and configures a browser instance with JS interception.
+        The found function names are returned by this method.
+        """
+        logging.info(f"Setting up browser for profile: {profile_dir.name}...")
+        
+        fingerprint_func_name: str | None = None
+        paint_func_name: str | None = None
+        fingerprint_func_found = asyncio.Future()
+        paint_func_found = asyncio.Future()
+        
+        config = zd.Config(headless=False, user_data_dir=str(profile_dir.absolute()), browser="brave",
+
+                        )
+        self.browser = await zd.start(config)
+        self.page = self.browser.main_tab
+        for tab in self.browser.tabs:
+            if tab != self.page:
+                await tab.close()
+        active_requests_count = 0
+
+        async def on_request_paused(event: cdp.fetch.RequestPaused):
+            nonlocal fingerprint_func_name, paint_func_name, active_requests_count
+            active_requests_count += 1
+            request_id = event.request_id
+            try:
+                if event.response_status_code is None or event.resource_type != cdp.network.ResourceType.SCRIPT:
+                    await self.page.send(cdp.fetch.continue_request(request_id=request_id))
+                    return
+
+                body_content, is_base64 = await self.page.send(
+                    cdp.fetch.get_response_body(request_id=request_id)
+                )
+                body_str = base64.b64decode(body_content).decode('utf-8', 'replace') if is_base64 else body_content
+                modified_body_str = body_str
+
+                # --- Find Fingerprint function (unchanged) ---
+                if not fingerprint_func_found.done():
+                    fp_match = re.search(r'async function\s+([a-zA-Z0-9_$]+)\(\)\s*\{\s*return\s*\(await\s*\(await\s*.*\)\.get\(\)\)\.visitorId', body_str)
+                    if fp_match:
+                        fingerprint_func_name = fp_match.group(1)
+                        modified_body_str += f"\n;window.getFingerprint = {fingerprint_func_name};\n"
+                        logging.info(f"[+] Exposed fingerprint function as 'window.getFingerprint'")
+                        fingerprint_func_found.set_result(True)
+                
+                # --- MODIFIED BLOCK: Use the new robust function for paint ---
+                if not paint_func_found.done():
+                    # The new function handles both finding and modifying the body
+                    modified_body_str, found_name = expose_paint_function(modified_body_str)
+                    if found_name:
+                        paint_func_name = found_name
+                        paint_func_found.set_result(True)
+                # --- END OF MODIFIED BLOCK ---
+
+                encoded_body = base64.b64encode(modified_body_str.encode('utf-8')).decode('ascii')
+                await self.page.send(cdp.fetch.fulfill_request(
+                    request_id=request_id,
+                    response_code=event.response_status_code,
+                    response_headers=event.response_headers or [],
+                    body=encoded_body
+                ))
+            except Exception as e:
+                logging.error(f"Error in request handler for {event.request.url}: {e}")
+                if not self.page.closed:
+                    try:
+                        await self.page.send(cdp.fetch.continue_request(request_id=request_id))
+                    except Exception as final_e:
+                        logging.error(f"Failed to continue request {request_id} after error: {final_e}")
+            finally:
+                active_requests_count -= 1
+
+        self.page.add_handler(cdp.fetch.RequestPaused, on_request_paused)
+        await self.page.send(cdp.network.set_cache_disabled(cache_disabled=True))
+        await self.page.send(cdp.fetch.enable(patterns=[
+            cdp.fetch.RequestPattern(resource_type=cdp.network.ResourceType.SCRIPT, request_stage=cdp.fetch.RequestStage.RESPONSE)
+        ]))
+
+        await self.page.get("https://wplace.live/")
+        await self.page.reload()
+
+        logging.info("Waiting for helper functions to be exposed on window object...")
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(fingerprint_func_found,  paint_func_found),
+                timeout=30.0
+            )
+            logging.info("All three helper functions found and exposed.")
+        except asyncio.TimeoutError:
+            raise Exception("Cannot run without finding all helper functions")
+        
+        logging.info("Waiting for page to complete loading...")
+        await self.page.wait_for_ready_state('complete', timeout=30)
+
+        while active_requests_count > 0:
+            logging.info(f"Waiting for {active_requests_count} in-flight request(s) to complete...")
+            await asyncio.sleep(0.1)
+
+        self.page.remove_handlers(cdp.fetch.RequestPaused, on_request_paused)
+        await self.page.send(cdp.fetch.disable())
+        logging.info("Request interception handler removed")
+
+        return fingerprint_func_name, paint_func_name
+
+    async def _fetch_and_update_user_data(self):
+        """Fetches the /me endpoint to update the user's state."""
+        if not self.page:
+            return
+
+        logging.info("Fetching latest user data from /me endpoint...")
+        js_code = """  
+        (async () => {  
+            const r = await fetch("https://backend.wplace.live/me", {credentials: 'include'});  
+            const data = await r.json();  
+            return JSON.stringify(data);  // Return as string  
+        })();  
+        """  
+
+        try:
+            new_user_data_str = await self.page.evaluate(js_code, await_promise=True)
+            if isinstance(new_user_data_str, tuple): # Handle zendriver's complex return types
+                new_user_data_str = new_user_data_str[0].value if new_user_data_str[0] else None
+            elif hasattr(new_user_data_str, 'value'):
+                new_user_data_str = new_user_data_str.value
+            
+            new_user_data = json.loads(new_user_data_str)
+            if new_user_data and 'id' in new_user_data:
+                self.user_data = new_user_data
+                self.update_state_from_user_data()
+            else:
+                logging.warning(f"Failed to fetch user data, received: {new_user_data}")
+        except Exception as e:
+            logging.error(f"Exception while fetching user data: {e}")
+            raise BrowserInteractionError("Failed to fetch and update user data.") from e
+
+    def update_state_from_user_data(self):
+        """Parses the user data dictionary to update internal state."""
+        if not self.user_data: return
+        self.current_charges = int(self.user_data.get('charges', {}).get('count', 0))
+        self.max_charges = int(self.user_data.get('charges', {}).get('max', 0))
+        self.droplets = int(self.user_data.get('droplets', 0))
+        logging.info(f"State updated: {self.current_charges}/{self.max_charges} charges, {self.droplets} droplets.")
+        if 'extraColorsBitmap' in self.user_data:
+            self._parse_available_colors(int(self.user_data['extraColorsBitmap']))
+
+    def _parse_available_colors(self, bitmap: int):
+        self.available_colors = set(range(32)) # Base colors
+        self.available_colors.add(0) # Transparent
+        if bitmap < 0: bitmap += (1 << 32)
+        binary_bitmap_reversed = bin(bitmap)[2:].zfill(32)[::-1]
+        for i, bit in enumerate(binary_bitmap_reversed):
+            if bit == '1' and (32 + i) < len(COLOR_PALETTE):
+                self.available_colors.add(32 + i)
+        logging.info(f"Parsed available colors: {len(self.available_colors)} total.")
+        
+    async def _filter_and_select_pixels_to_paint(self) -> List[Tuple[int, int, int]]:
+        """
+        Uses all available charges to paint template pixels, then burns any
+        remaining charges strategically.
+        """
+        # --- Template Painting ---
+        # We will always use all available charges.
+        spendable_charges = self.current_charges
+        if spendable_charges == 0:
+            logging.info("No charges available to paint.")
+            return []
+
+        logging.info(f"Have {spendable_charges} charges to spend.")
+
+        # Filter the queue for colors the user owns.
+        candidate_pixels = [(p, gx, gy, cid) for p, gx, gy, cid in self.pixel_queue if cid in self.available_colors]
+
+        final_pixel_payload = []
+        if not candidate_pixels:
+            logging.info("No template pixels need painting with available colors.")
+        else:
+            logging.info(f"Found {len(candidate_pixels)} paintable template pixels. Selecting up to {spendable_charges}.")
+            # Use the human-like placer to select the most important pixels up to our charge limit.
+            final_pixel_payload = get_human_like_ordered_pixels(candidate_pixels, spendable_charges)
+            logging.info(f"Selected {len(final_pixel_payload)} template pixels to paint.")
+
+        # --- Charge Burning Logic ---
+        # Calculate remaining charges and burn all of them.
+        charges_after_paint = self.current_charges - len(final_pixel_payload)
+        num_to_burn = charges_after_paint
+        
+        if num_to_burn > 0:
+            logging.info(f"Will burn {num_to_burn} remaining charges.")
+            coords_to_paint_burn = []
+            
+            # --- STRATEGIC CHARGE BURNING ---
+            if self.burn_candidates:
+                num_added = min(num_to_burn, len(self.burn_candidates))
+                coords_to_paint_burn = random.sample(self.burn_candidates, num_added)
+                for gx, gy in coords_to_paint_burn:
+                    final_pixel_payload.append((gx, gy, 0)) # Color 0 is Transparent
+                logging.info(f"Added {num_added} pixels using pre-analyzed targeted burn strategy.")
+            
+            # Fallback if the strategic burn didn't use up all charges or wasn't available
+            remaining_to_burn = num_to_burn - len(coords_to_paint_burn)
+            if remaining_to_burn > 0 and self.available_transparent_pixels:
+                logging.info("Falling back to random transparent strategy for remaining burn.")
+                
+                # Group transparent pixels by tile to place them in a concentrated area.
+                pixels_by_tile = defaultdict(list)
+                for gx, gy in self.available_transparent_pixels:
+                    pixels_by_tile[(gx // 1000, gy // 1000)].append((gx, gy))
+
+                if pixels_by_tile:
+                    # Find the tile with the most available transparent pixels for burning
+                    best_tile = max(pixels_by_tile, key=lambda k: len(pixels_by_tile[k]))
+                    fallback_burn_candidates = pixels_by_tile[best_tile]
+                    
+                    num_added = min(remaining_to_burn, len(fallback_burn_candidates))
+                    coords_to_paint_fallback = random.sample(fallback_burn_candidates, num_added)
+                    for gx, gy in coords_to_paint_fallback:
+                        final_pixel_payload.append((gx, gy, 0))
+                    logging.info(f"Added {num_added} transparent pixels to burn on tile {best_tile} (fallback).")
+
+        return final_pixel_payload
+        
+    async def _send_authenticated_post(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any] | None:
+        """Helper to send a generic authenticated POST request via browser fetch."""
+        if not self.page:
+            logging.error("Cannot send POST: page is not available.")
+            return None
+
+        # Define necessary headers for the POST request locally.
+        # Authentication headers are handled automatically by `credentials: 'include'`.
+        headers = {'Content-Type': 'text/plain;charset=UTF-8'}
+        payload_json = json.dumps(payload, separators=(',', ':'))
+
+        js_code = f"""
+        (async () => {{
+            const r = await fetch({json.dumps(url)}, {{
+                method: 'POST',
+                headers: {json.dumps(headers)},
+                body: {json.dumps(payload_json)},
+                credentials: 'include'
+            }});
+            return {{ ok: r.ok, status: r.status, text: await r.text() }};
+        }})();
+        """
+        try:
+            raw_result = await self.page.evaluate(js_code, await_promise=True)
+            result = raw_result
+            if isinstance(raw_result, tuple):
+                result = raw_result[0].value if raw_result[0] else None
+            elif hasattr(raw_result, 'value'):
+                result = raw_result.value
+            return result
+        except Exception as e:
+            logging.error(f"Failed to execute authenticated POST to {url}: {e}")
+            return None
+
+    async def _handle_purchases(self) -> bool:
+        """
+        Checks for and executes purchases for colors or max charges based on priority rules.
+        """
+        missing_colors = set(range(len(COLOR_PALETTE))) - self.available_colors
+        
+        # --- Priority 1: Buy Missing Colors ---
+        # If there are missing colors and we have enough droplets, buy one.
+        if missing_colors and self.droplets >= 2000:
+            color_to_buy = random.choice(list(missing_colors))
+            color_name = COLOR_PALETTE_JSON[color_to_buy]['name']
+            logging.info(f"Attempting to buy missing color '{color_name}' (ID: {color_to_buy}).")
+            payload = {"product": {"id": 100, "amount": 1, "variant": color_to_buy}}
+            result = await self._send_authenticated_post("https://backend.wplace.live/purchase", payload)
+            
+            if result and result.get("ok"):
+                logging.info(f"Purchase request for color '{color_name}' sent successfully.")
+            else:
+                logging.warning(f"Purchase for color failed. Response: {result}")
+            return True  # A purchase was attempted
+
+        # --- Priority 2: Buy Max Charges ---
+        droplets_available_for_charges = 0
+        
+        # Condition A: Always buy if max charges are below 200 and we can afford it.
+        if self.max_charges < 200 and self.droplets >= 500:
+            droplets_available_for_charges = self.droplets
+            logging.info(f"Max charges ({self.max_charges}) are below 200. Using all available droplets for upgrades.")
+        
+        # Condition B: Spend any droplets over the 20,000 threshold.
+        elif self.droplets > 20000:
+            droplets_available_for_charges = self.droplets - 20000
+            logging.info(f"Droplets ({self.droplets}) are over 20,000. Using excess for upgrades.")
+
+        # If either condition provided droplets for charges, execute the purchase.
+        if droplets_available_for_charges >= 500:
+            amount_to_buy = droplets_available_for_charges // 500
+            if amount_to_buy > 0:
+                logging.info(f"Attempting to buy {amount_to_buy} max charge upgrades.")
+                payload = {"product": {"id": 70, "amount": amount_to_buy}}
+                result = await self._send_authenticated_post("https://backend.wplace.live/purchase", payload)
+                
+                if result and result.get("ok"):
+                    logging.info(f"Purchase request for max charges sent successfully.")
+                else:
+                    logging.warning(f"Purchase for max charges failed. Response: {result}")
+                return True  # A purchase was attempted
+            
+        return False # No purchase was attempted
+
+    async def _execute_paint_requests(self, pixels_to_paint: List[Tuple[int, int, int]]) -> int:
+        """
+        Captures a paint token via network interception and then uses the exposed JS 
+        paint function to paint pixels.
+        """
+        if not self.page or not pixels_to_paint:
+            return 0
+
+        # --- Step 1: Capture a valid paint token by simulating a single UI paint ---
+        captured_data_future: asyncio.Future[Dict[str, Any]] = asyncio.Future()
+
+        async def on_paint_request_paused(event: cdp.fetch.RequestPaused):
+            if "backend.wplace.live/s0/pixel/" in event.request.url and event.request.method == 'POST':
+                if captured_data_future.done():
+                    try:
+                        await self.page.send(cdp.fetch.fail_request(request_id=event.request_id, error_reason=cdp.network.ErrorReason.ABORTED))
+                    except Exception: pass
+                    return
+
+                try:
+                    # Capture the request body which contains the token.
+                    captured_data_future.set_result({'body': event.request.post_data})
+                    # Fulfill with a dummy response to prevent the UI from erroring out.
+                    dummy_response_body = base64.b64encode(b'{"status":"ok"}').decode('ascii')
+                    await self.page.send(cdp.fetch.fulfill_request(
+                        request_id=event.request_id, response_code=200, body=dummy_response_body
+                    ))
+                except Exception as e:
+                    if not captured_data_future.done():
+                        captured_data_future.set_exception(e)
+            else:
+                try:
+                    await self.page.send(cdp.fetch.continue_request(request_id=event.request_id))
+                except Exception as e:
+                    logging.warning(f"Failed to continue request ({event.request.url}): {e}")
+
+        await self.page.send(cdp.fetch.enable(patterns=[
+            cdp.fetch.RequestPattern(request_stage=cdp.fetch.RequestStage.REQUEST)
+        ]))
+        self.page.add_handler(cdp.fetch.RequestPaused, on_paint_request_paused)
+        
+        try:
+            logging.info("Network interception enabled. Triggering UI paint action to capture token...")
+            await (await self.page.select(r'div[class*="bottom-3"] button.btn-primary:not(:disabled)')).click()
+            await (await self.page.select("#color-0")).click()
+            await (await self.page.select("canvas.maplibregl-canvas")).click()
+            paint_button_selector = 'div[class*="left-1/2"] button.btn-primary:not(:disabled)'
+            logging.info(f"Waiting for paint button '{paint_button_selector}' to become enabled...")
+
+            timeout = 15
+            timeout_start = asyncio.get_event_loop().time()
+            while asyncio.get_event_loop().time() < timeout_start + timeout:
+                try:
+                    paint_button = await self.page.select(paint_button_selector, timeout=1)
+                    logging.info("Paint button is enabled. Clicking now.")
+                    await paint_button.click()
+                    break
+                except asyncio.TimeoutError:
+                    logging.error(f"Timeout waiting for paint button. Checking for CF challenge.")
+                    try:
+                        await self.page.verify_cf(click_delay=0.25, timeout=1)
+                    except Exception as cf_e:
+                        logging.error(f"Failed to solve Cloudflare challenge: {cf_e}")
+            
+            captured_data = await asyncio.wait_for(captured_data_future, timeout=15)
+            
+            if not captured_data or not captured_data.get('body'):
+                raise ValueError("Interception succeeded but captured no post data.")
+
+            self.paint_token = json.loads(captured_data['body']).get('t')
+            if not self.paint_token:
+                raise ValueError("Token not found in intercepted data.")
+
+            logging.info(f"Successfully captured paint token: {self.paint_token[:10]}...")
+        except Exception as e:
+            logging.error(f"Error during token capture: {e}", exc_info=True)
+            raise BrowserInteractionError("Failed to capture paint token.") from e
+        finally:
+            self.page.remove_handlers(cdp.fetch.RequestPaused, on_paint_request_paused)
+            await self.page.send(cdp.fetch.disable())
+            logging.info("Network interception disabled.")
+            
+        # --- Step 2: Prepare data for the exposed paint function ---
+        pixel_js_array = []
+        season = 0  # s0 is the current season
+        for gx, gy, color_id in pixels_to_paint:
+            tx, px = divmod(gx, 1000)
+            ty, py = divmod(gy, 1000)
+            pixel_js_array.append({
+                "tile": [tx, ty],
+                "season": season,
+                "colorIdx": int(color_id),
+                "pixel": [px, py]
+            })
+
+        # --- Step 3: Get fingerprint ---
+        try:
+            # The exposed getFingerprint function returns the visitorId string directly.
+            js_fp_expr = "(async () => await window.getFingerprint())()"
+            raw_fp_obj = await self.page.evaluate(js_fp_expr, await_promise=True)
+            fp = raw_fp_obj
+            if isinstance(fp, tuple):
+                fp = fp[0].value if fp[0] else None
+            elif hasattr(fp, 'value'):
+                fp = fp.value
+            
+            if not isinstance(fp, str):
+                raise TypeError(f"Expected string from fingerprint, got {type(fp)}")
+            logging.info(f"Retrieved fingerprint: {fp[:20]}...")
+        except Exception as e:
+            logging.error(f"Failed to get fingerprint: {e}", exc_info=True)
+            raise BrowserInteractionError("Failed to retrieve fingerprint.") from e
+
+        # --- Step 4: Call the exposed paint function ---
+        successful_pixels = 0
+        try:
+            pixel_data_json = json.dumps(pixel_js_array)
+            js_code = f"""
+            (async () => {{
+                try {{
+                    const pixels = {pixel_data_json};
+                    const token = {json.dumps(self.paint_token)};
+                    const fingerprint = {json.dumps(fp)};
+                    
+                    // The original JS paint function does not return anything on success, but throws on error.
+                    await window.exposedPaintFunction(pixels, token, fingerprint);
+                    
+                    // If it doesn't throw, we assume success for all pixels.
+                    return {{ "ok": true, "count": {len(pixels_to_paint)} }};
+                }} catch (e) {{
+                    return {{ "ok": false, "error": e.stack || e.toString() }};
+                }}
+            }})();
+            """
+            result_obj = await self.page.evaluate(js_code, await_promise=True)
+            
+            result = result_obj
+            if isinstance(result, tuple):
+                result = result[0].value if result[0] else None
+            elif hasattr(result, 'value'):
+                result = result.value
+
+            if result and result.get("ok"):
+                successful_pixels = result.get("count", 0)
+                logging.info(f"Successfully painted {successful_pixels} pixels via exposed function.")
+            else:
+                error_msg = result.get('error') if result else "Unknown error"
+                logging.error(f"Paint via exposed function failed with JS error: {error_msg}")
+
+        except Exception as e:
+            logging.error(f"Failed to execute paint via exposed function: {e}", exc_info=True)
+        
+        logging.info(f"Finished painting. Successfully painted {successful_pixels} pixels.")
+        return successful_pixels
+
+--- End of content from ./painter.py ---
+
+--- Start of content from ./requirements.txt ---
+
+numpy
+Pillow
+Requests
+scikit_learn
+scipy
+stealth_requests
+zendriver
+
+
+--- End of content from ./requirements.txt ---
+
+--- Start of content from ./run_manager.py ---
+
+# run_manager.py
+import logging
+import subprocess
+import time
+import threading
+import random
+from pathlib import Path
+from typing import List, Dict, Any, Set
+
+from wplace_bot.config import (
+    PROFILE_DATA_FILE, CHARGE_GAIN_RATE_SECONDS, PROFILES_TO_USE,
+    PROFILES_FOLDER, PROFILE_TIMEOUT_SECONDS, RUN_INTERVAL_SECONDS,
+    RANDOM_TILE_CHECK_INTERVAL_SECONDS, TEMPLATE_DIRECTORY, IDLE_CHECK_INTERVAL_SECONDS
+)
+from wplace_bot.utils.file_io import load_profile_data, get_template_files
+from wplace_bot.analysis.canvas_analyzer import CanvasAnalyzer
+
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [MANAGER] [%(levelname)s] - %(message)s",
+    handlers=[logging.FileHandler("profile_manager.log", mode='w'), logging.StreamHandler()]
+)
+
+# --- Shared State for Manager and Monitoring Thread ---
+templates_to_fix: Set[Path] = set()
+all_template_paths: List[Path] = []
+state_lock = threading.Lock()
+
+def check_template(template_path: Path) -> bool:
+    """Analyzes a single template and returns True if it needs fixing."""
+    try:
+        analyzer = CanvasAnalyzer()
+        analyzer.analyze_templates([template_path])
+        return analyzer.needs_fixing()
+    except Exception as e:
+        logging.error(f"[Monitor] Error analyzing template {template_path.name}: {e}")
+        return False
+
+def canvas_monitoring_worker():
+    """
+    A worker thread that periodically checks the canvas state.
+    On start, it checks all templates. Then, it checks a random template periodically.
+    """
+    global templates_to_fix, all_template_paths
+    logging.info("[Monitor] Starting initial canvas scan of all templates...")
+    
+    initial_fix_list = [path for path in all_template_paths if check_template(path)]
+    
+    with state_lock:
+        templates_to_fix.update(initial_fix_list)
+        
+    logging.info(f"[Monitor] Initial scan complete. Found {len(templates_to_fix)} templates needing fixes.")
+
+    while True:
+        try:
+            time.sleep(RANDOM_TILE_CHECK_INTERVAL_SECONDS)
+            if not all_template_paths:
+                continue
+
+            template_to_check = random.choice(all_template_paths)
+            logging.info(f"[Monitor] Performing random check on: {template_to_check.name}")
+            
+            needs_fixing = check_template(template_to_check)
+            
+            with state_lock:
+                if needs_fixing and template_to_check not in templates_to_fix:
+                    logging.info(f"[Monitor] Found new template to fix: {template_to_check.name}")
+                    templates_to_fix.add(template_to_check)
+                elif not needs_fixing and template_to_check in templates_to_fix:
+                    logging.info(f"[Monitor] Template is now fixed, removing from queue: {template_to_check.name}")
+                    templates_to_fix.remove(template_to_check)
+
+        except Exception as e:
+            logging.error(f"[Monitor] An error occurred in the monitoring loop: {e}", exc_info=True)
+
+def calculate_profile_statuses(all_data: Dict[str, Any], profiles_to_run: List[str]) -> List[Dict[str, Any]]:
+    """Calculates the current estimated charges and identifies profiles at full charge."""
+    statuses = []
+    current_time = time.time()
+    
+    for name in profiles_to_run:
+        data = all_data.get(name)
+        if not data:
+            statuses.append({"name": name, "estimated_charges": 0, "max_charges": 100, "is_full": False})
+            continue
+
+        seconds_since_update = current_time - data.get("last_updated_timestamp", current_time)
+        charges_gained = seconds_since_update / CHARGE_GAIN_RATE_SECONDS
+        estimated_charges = min(data["max_charges"], data["current_charges"] + charges_gained)
+        is_full = estimated_charges >= data["max_charges"]
+            
+        statuses.append({
+            "name": name, "estimated_charges": estimated_charges,
+            "max_charges": data["max_charges"], "is_full": is_full,
+        })
+    return statuses
+
+def run_single_profile_script(profile_name: str, templates_to_fix_paths: List[Path]):
+    """Runs the single-profile painter script, passing it all templates that need fixing."""
+    if not templates_to_fix_paths:
+        logging.warning("run_single_profile_script called with no templates to fix. Skipping.")
+        return
+
+    template_path_strs = [str(p.absolute()) for p in templates_to_fix_paths]
+    command = [
+        "python", "-m", "wplace_bot.run_single_profile", profile_name,
+        *template_path_strs, # Unpack the list of paths as arguments
+        "--profiles_folder", str(PROFILES_FOLDER),
+    ]
+    logging.info(f"Starting subprocess for profile: '{profile_name}' to fix {len(templates_to_fix_paths)} template(s).")
+    try:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = process.communicate(timeout=PROFILE_TIMEOUT_SECONDS)
+        
+        if process.returncode != 0:
+            logging.error(f"Subprocess for '{profile_name}' failed. Stderr:\n{stderr}")
+        else:
+            logging.info(f"Subprocess for '{profile_name}' finished. Stdout:\n{stdout}")
+            
+    except subprocess.TimeoutExpired:
+        logging.warning(f"Timeout exceeded for '{profile_name}'. Terminating...")
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+    except Exception as e:
+        logging.critical(f"Error running subprocess for '{profile_name}': {e}", exc_info=True)
+
+def main_loop():
+    """Main loop to select and run profiles."""
+    global templates_to_fix, all_template_paths
+
+    logging.info("--- Manager starting main operational loop ---")
+    
+    while True:
+        logging.info("--- Starting new manager cycle ---")
+        
+        profile_data = load_profile_data()
+        statuses = calculate_profile_statuses(profile_data, PROFILES_TO_USE)
+        
+        full_profiles = [p for p in statuses if p["is_full"]]
+        
+        if not full_profiles:
+            logging.info(f"No profiles are at full charges. Checking again in {IDLE_CHECK_INTERVAL_SECONDS}s.")
+            time.sleep(IDLE_CHECK_INTERVAL_SECONDS)  # Short wait if idle
+            continue
+
+        # If we have profiles at full charge, run them all.
+        logging.info(f"Found {len(full_profiles)} profile(s) at full charge. Preparing to run them.")
+        
+        with state_lock:
+            current_templates_to_fix = list(templates_to_fix)
+
+        templates_for_run = current_templates_to_fix
+        if not templates_for_run:
+            # If no templates need fixing, we still run to burn charges.
+            # We must provide a template for canvas analysis to find transparent pixels.
+            if all_template_paths:
+                templates_for_run = []
+                logging.info(f"No templates need fixing. Running profiles to burn charges only.")
+            else:
+                logging.error("Cannot perform burn-only run because no templates are available.")
+                time.sleep(RUN_INTERVAL_SECONDS)
+                continue
+
+        for profile_to_run in full_profiles:
+            profile_to_run_name = profile_to_run['name']
+            logging.info(f"Dispatching profile: '{profile_to_run_name}'")
+            run_single_profile_script(profile_to_run_name, templates_for_run)
+            time.sleep(5)  # Small delay between starting profiles
+        
+        logging.info(f"--- All full profiles have been dispatched. Waiting for {RUN_INTERVAL_SECONDS}s before next major cycle. ---")
+        time.sleep(RUN_INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    all_template_paths = get_template_files(TEMPLATE_DIRECTORY)
+    if not all_template_paths:
+        logging.error(f"No templates found in '{TEMPLATE_DIRECTORY}'. Manager cannot run.")
+    else:
+        monitor_thread = threading.Thread(target=canvas_monitoring_worker, daemon=True)
+        monitor_thread.start()
+        
+        try:
+            main_loop()
+        except KeyboardInterrupt:
+            logging.info("Manager script interrupted by user.")
+
+--- End of content from ./run_manager.py ---
+
+--- Start of content from ./run_single_profile.py ---
+
+# run_single_profile.py
+import argparse
+import asyncio
+import logging
+from pathlib import Path
+from typing import List
+
+from wplace_bot.analysis.canvas_analyzer import CanvasAnalyzer
+from wplace_bot.config import LOG_FILE
+from wplace_bot.painter import WplacePainter, BrowserInteractionError
+from wplace_bot.utils.file_io import save_profile_data
+
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] - %(message)s",
+    handlers=[logging.FileHandler(LOG_FILE, mode='a'), logging.StreamHandler()]
+)
+
+async def process_profile(args):
+    """Handles the entire lifecycle for a single profile."""
+    profile_name = args.profile_name
+    templates_to_analyze: List[Path] = [Path(p) for p in args.target_templates]
+    painter = None
+    try:
+        logging.info(f"--- Starting process for profile: {profile_name} on {len(templates_to_analyze)} template(s) ---")
+        profile_dir = Path(args.profiles_folder) / profile_name
+        if not profile_dir.is_dir():
+            logging.error(f"Profile directory not found: {profile_dir}. Aborting.")
+            return
+
+        for t in templates_to_analyze:
+            if not t.is_file():
+                logging.error(f"Target template file not found: {t}. Aborting.")
+                return
+
+        # 1. Analyze all target templates and burn candidates before starting the browser.
+        analyzer = CanvasAnalyzer()
+        analyzer.analyze_templates(templates_to_analyze)
+        analyzer.analyze_burn_candidates()
+
+        if not analyzer.pixel_queue:
+            logging.info("Re-analysis shows no pixels need fixing across target templates. Will proceed to burn charges if any.")
+            
+        # 2. Instantiate painter and start the browser.
+        painter = WplacePainter(
+            analyzer.pixel_queue, 
+            analyzer.available_transparent_pixels,
+            analyzer.burn_candidates
+        )
+        await painter.setup_browser(profile_dir)
+        await painter._fetch_and_update_user_data() 
+
+        # 3. Select pixels, paint, and handle purchases.
+        pixels_to_paint = await painter._filter_and_select_pixels_to_paint()
+        painted_count = 0
+        if pixels_to_paint:
+            painted_count = await painter._execute_paint_requests(pixels_to_paint)
+            logging.info(f"Painted {painted_count} pixels for '{profile_name}'.")
+        else:
+            logging.info("No pixels were selected to be painted.")
+
+        # 4. Handle purchases after painting.
+        if await painter._handle_purchases():
+            logging.info("A purchase was attempted. Refreshing user state.")
+            await asyncio.sleep(2) # Give the backend a moment to process the purchase
+            await painter._fetch_and_update_user_data()
+
+    except (Exception, BrowserInteractionError) as e:
+        logging.critical(f"A critical error occurred for profile '{profile_name}': {e}", exc_info=True)
+    finally:
+        if painter:
+            try:
+                if painter.page and not painter.page.closed:
+                    await painter._fetch_and_update_user_data()
+            except Exception as fetch_e:
+                logging.error(f"Could not fetch final user data before exit: {fetch_e}")
+
+            if painter.user_data:
+                save_profile_data(profile_name, painter.current_charges, painter.max_charges)
+
+            if painter.browser:
+                try:
+                    if painter.browser.main_tab and not painter.browser.main_tab.closed:
+                        await painter.browser.main_tab.save_screenshot(f"{profile_name}_final.png")
+                except Exception as ss_e:
+                    logging.warning(f"Could not save final screenshot: {ss_e}")
+                
+                await painter.browser.stop()
+        logging.info(f"--- Finished process for profile: {profile_name} ---")
+
+def main():
+    parser = argparse.ArgumentParser(description="Run Wplace Painter for a single profile to fix specific templates.")
+    parser.add_argument("profile_name", type=str, help="The name of the profile folder to use.")
+    parser.add_argument("target_templates", type=str, nargs='+', help="A list of full paths to the .png templates to fix.")
+    parser.add_argument("--profiles_folder", type=str, default="./Profiles", help="Folder containing Chrome profiles.")
+    args = parser.parse_args()
+    
+    try:
+        asyncio.run(process_profile(args))
+    except KeyboardInterrupt:
+        logging.info("Script interrupted by user.")
+
+if __name__ == "__main__":
+    main()
+
+--- End of content from ./run_single_profile.py ---
+
+--- Start of content from ./analysis\burn_strategies.py ---
+
+# wplace_bot/analysis/burn_strategies.py
+import io
+import logging
+from typing import List, Tuple, Set
+
+import numpy as np
+import requests
+from PIL import Image
+from stealth_requests import StealthSession
+
+from wplace_bot.utils.color_helper import find_color_ids_with_alpha
+
+class BurnStrategy:
+    """Base class for all charge burning strategies."""
+    def __init__(self, **kwargs):
+        pass
+
+    def analyze(self, session: StealthSession) -> List[Tuple[int, int]]:
+        """
+        Analyzes the canvas and returns a list of (gx, gy) coordinates to target.
+
+        Args:
+            session: An active StealthSession for making network requests.
+
+        Returns:
+            A list of (gx, gy) pixel coordinates.
+        """
+        raise NotImplementedError("Each strategy must implement the 'analyze' method.")
+
+
+class EnclosedComponentBurnStrategy(BurnStrategy):
+    """
+    A strategy that finds connected components of a specific "sacrificial" color
+    that are completely surrounded by transparent pixels on a designated tile.
+    """
+    def __init__(self, tile_x: int, tile_y: int, color_id: int, **kwargs):
+        super().__init__(**kwargs)
+        self.tile_x = tile_x
+        self.tile_y = tile_y
+        self.color_id = color_id
+        logging.info(f"Initialized EnclosedComponentBurnStrategy for tile ({tile_x},{tile_y}) targeting color ID {color_id}.")
+
+    @staticmethod
+    def _fetch_tile_image(tx: int, ty: int, session: StealthSession) -> Image.Image | None:
+        """Fetches and returns a single tile image."""
+        url = f"https://backend.wplace.live/files/s0/tiles/{tx}/{ty}.png"
+        try:
+            response = session.get(url, timeout=10, retry=3)
+            response.raise_for_status()
+            return Image.open(io.BytesIO(response.content)).convert("RGBA")
+        except requests.RequestException as e:
+            logging.error(f"Failed to fetch tile ({tx},{ty}) for burn analysis: {e}")
+            return None
+
+    def _find_enclosed_component(
+        self,
+        start_x: int,
+        start_y: int,
+        color_ids: np.ndarray,
+        visited: Set[Tuple[int, int]]
+    ) -> List[Tuple[int, int]]:
+        """
+        Finds a connected component of the target color using BFS and checks if it's enclosed.
+        An enclosed component is one that is only connected to itself or to transparent pixels (ID 0).
+        """
+        height, width = color_ids.shape
+        component = []
+        queue = [(start_x, start_y)]
+        visited.add((start_x, start_y))
+        is_enclosed = True
+
+        # BFS to find the component and check its boundary simultaneously
+        head = 0
+        while head < len(queue):
+            x, y = queue[head]
+            head += 1
+            component.append((x, y))
+
+            # Check all 8 neighbors in the 3x3 grid
+            for dy in range(-1, 2):
+                for dx in range(-1, 2):
+                    if dx == 0 and dy == 0:
+                        continue
+
+                    nx, ny = x + dx, y + dy
+
+                    # Check if neighbor is out of bounds; if so, we can't confirm it's enclosed
+                    if not (0 <= ny < height and 0 <= nx < width):
+                        is_enclosed = False
+                        continue
+
+                    neighbor_color = color_ids[ny, nx]
+
+                    # If the neighbor is another color (not transparent and not our target color)
+                    if neighbor_color != 0 and neighbor_color != self.color_id:
+                        is_enclosed = False
+
+                    # If the neighbor is part of our component and not yet visited, add to queue
+                    elif neighbor_color == self.color_id and (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        queue.append((nx, ny))
+
+        return component if is_enclosed else []
+
+    def analyze(self, session: StealthSession) -> List[Tuple[int, int]]:
+        """
+        Analyzes the configured tile to find enclosed components suitable for burning.
+        """
+        logging.info(f"Executing burn analysis on tile ({self.tile_x}, {self.tile_y}).")
+        tile_image = self._fetch_tile_image(self.tile_x, self.tile_y, session)
+
+        if not tile_image:
+            logging.error("Could not retrieve tile image; aborting burn analysis.")
+            return []
+
+        color_ids = find_color_ids_with_alpha(np.array(tile_image))
+        height, width = color_ids.shape
+        visited: Set[Tuple[int, int]] = set()
+        all_candidates: List[Tuple[int, int]] = []
+
+        # Iterate through every pixel to find potential starting points of components
+        for y in range(height):
+            for x in range(width):
+                if color_ids[y, x] == self.color_id and (x, y) not in visited:
+                    component = self._find_enclosed_component(x, y, color_ids, visited)
+                    if component:
+                        # Convert local (px, py) to global (gx, gy) coordinates
+                        global_coords = [
+                            (self.tile_x * 1000 + comp_x, self.tile_y * 1000 + comp_y)
+                            for comp_x, comp_y in component
+                        ]
+                        all_candidates.extend(global_coords)
+
+        print(f"EnclosedComponentBurnStrategy found {len(all_candidates)} candidates.")
+        return all_candidates
+
+
+# --- Strategy Mapping ---
+# To add a new strategy:
+# 1. Create a new class that inherits from BurnStrategy.
+# 2. Implement the analyze() method.
+# 3. Add the class to this dictionary with a unique key.
+STRATEGY_MAPPING = {
+    "enclosed_component": EnclosedComponentBurnStrategy,
+    # "another_strategy": AnotherStrategyClass,
+}
+
+--- End of content from ./analysis\burn_strategies.py ---
+
+--- Start of content from ./analysis\canvas_analyzer.py ---
+
+# wplace_bot/analysis/canvas_analyzer.py
+import functools
+import io
+import logging
+import re
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Dict, List, Tuple, Any
+
+import numpy as np
+import requests
+from PIL import Image
+from stealth_requests import StealthSession
+
+from wplace_bot.analysis.burn_strategies import STRATEGY_MAPPING
+from wplace_bot.config import BURN_STRATEGY, BURN_STRATEGY_CONFIG
+from wplace_bot.utils.color_helper import find_color_ids_with_alpha
+
+class CanvasAnalyzer:
+    """Analyzes differences between local templates and the live canvas."""
+
+    def __init__(self):
+        self.pixel_queue: List[Tuple[float, int, int, int]] = []
+        self.available_transparent_pixels: List[Tuple[int, int]] = []
+        self.burn_candidates: List[Tuple[int, int]] = []
+
+    def needs_fixing(self) -> bool:
+        """Returns True if the analysis found any pixels to paint."""
+        return len(self.pixel_queue) > 0
+
+    def analyze_templates(self, template_files: List[Path]):
+        """
+        Processes a list of template files to find pixels that need painting.
+        
+        This method populates the internal pixel_queue and available_transparent_pixels.
+        """
+        for template_path in template_files:
+            try:
+                template_data = self._get_template_data(template_path)
+                self._analyze_single_template(template_data)
+            except ValueError as e:
+                logging.error(f"Skipping template due to error: {e}")
+        
+        self.pixel_queue.sort(key=lambda item: item[0], reverse=True)
+        if len(template_files) > 1:
+            logging.info(f"Finished all analysis. Total queue: {len(self.pixel_queue)} pixels.")
+
+    def analyze_burn_candidates(self):
+        """
+        Initializes and runs the selected burn strategy from the config.
+        """
+        if not BURN_STRATEGY or BURN_STRATEGY not in STRATEGY_MAPPING:
+            logging.info("No valid burn strategy selected in config. Skipping analysis.")
+            return
+
+        strategy_class = STRATEGY_MAPPING[BURN_STRATEGY]
+        strategy_config = BURN_STRATEGY_CONFIG.get(BURN_STRATEGY, {})
+        
+        try:
+            strategy = strategy_class(**strategy_config)
+            with StealthSession() as session:
+                self.burn_candidates = strategy.analyze(session)
+        except Exception as e:
+            logging.error(f"Error executing burn strategy '{BURN_STRATEGY}': {e}", exc_info=True)
+            self.burn_candidates = []
+
+
+    def _get_template_data(self, template_path: Path) -> Dict[str, Any]:
+        logging.info(f"Loading template from {template_path}...")
+        match = re.match(r"(\d+),(\d+),(\d+),(\d+)\.png", template_path.name)
+        if not match:
+            raise ValueError(f"Template filename '{template_path.name}' must be 'tileX,tileY,pixelX,pixelY.png'")
+        
+        tx_start, ty_start, px_start, py_start = map(int, match.groups())
+        img = Image.open(template_path).convert("RGBA")
+        width, height = img.size
+        
+        covered_tiles = {
+            (x, y)
+            for x in range(tx_start, (tx_start * 1000 + px_start + width + 999) // 1000)
+            for y in range(ty_start, (ty_start * 1000 + py_start + height + 999) // 1000)
+        }
+        
+        logging.info(f"Template loaded: {width}x{height} pixels, covering {len(covered_tiles)} tiles.")
+        return {
+            "image": img, "path": template_path, "tx_start": tx_start, "ty_start": ty_start,
+            "px_start": px_start, "py_start": py_start, "width": width, "height": height,
+            "covered_tiles": covered_tiles
+        }
+
+    @staticmethod
+    def _fetch_tile_image(tile_coords: Tuple[int, int], session: StealthSession) -> Tuple[Tuple[int, int], Image.Image | None]:
+        tx, ty = tile_coords
+        url = f"https://backend.wplace.live/files/s0/tiles/{tx}/{ty}.png"
+        try:
+            response = session.get(url, timeout=10, retry=3)
+            response.raise_for_status()
+            return tile_coords, Image.open(io.BytesIO(response.content)).convert("RGBA")
+        except requests.RequestException as e:
+            logging.error(f"Failed to fetch tile ({tx},{ty}): {e}")
+            return tile_coords, None
+
+    def _analyze_single_template(self, template_data: Dict[str, Any]):
+        logging.info(f"Analyzing differences for template: {template_data['path'].name}...")
+        live_tiles: Dict[Tuple[int, int], Image.Image] = {}
+
+        with StealthSession() as session:
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                fetch_func = functools.partial(self._fetch_tile_image, session=session)
+                for coords, img in executor.map(fetch_func, template_data["covered_tiles"]):
+                    if img: live_tiles[coords] = img
+
+        newly_found_pixels, newly_found_transparent = [], []
+        template_gx_start = template_data["tx_start"] * 1000 + template_data["px_start"]
+        template_gy_start = template_data["ty_start"] * 1000 + template_data["py_start"]
+
+        for (tx, ty), live_tile_img in live_tiles.items():
+            tile_gx_start, tile_gy_start = tx * 1000, ty * 1000
+            inter_x_start = max(template_gx_start, tile_gx_start)
+            inter_y_start = max(template_gy_start, tile_gy_start)
+            inter_x_end = min(template_gx_start + template_data["width"], tile_gx_start + 1000)
+            inter_y_end = min(template_gy_start + template_data["height"], tile_gy_start + 1000)
+            
+            inter_width = inter_x_end - inter_x_start
+            inter_height = inter_y_end - inter_y_start
+            if inter_width <= 0 or inter_height <= 0: continue
+            
+            template_crop = (inter_x_start - template_gx_start, inter_y_start - template_gy_start, inter_x_start - template_gx_start + inter_width, inter_y_start - template_gy_start + inter_height)
+            live_crop = (inter_x_start - tile_gx_start, inter_y_start - tile_gy_start, inter_x_start - tile_gx_start + inter_width, inter_y_start - tile_gy_start + inter_height)
+            
+            template_np = np.array(template_data["image"].crop(template_crop))
+            live_np = np.array(live_tile_img.crop(live_crop))
+            template_color_ids = find_color_ids_with_alpha(template_np)
+            live_color_ids = find_color_ids_with_alpha(live_np)
+
+            for py in range(inter_height):
+                for px in range(inter_width):
+                    global_x, global_y = inter_x_start + px, inter_y_start + py
+                    template_id, live_id = template_color_ids[py, px], live_color_ids[py, px]
+                    
+                    if template_np[py, px, 3] > 128 and template_id != live_id:
+                        newly_found_pixels.append((1.0, global_x, global_y, template_id))
+                    elif live_id == 0: 
+                        newly_found_transparent.append((global_x, global_y))
+        
+        self.pixel_queue.extend(newly_found_pixels)
+        self.available_transparent_pixels.extend(newly_found_transparent)
+        logging.info(f"Analysis for '{template_data['path'].name}' added {len(newly_found_pixels)} pixels.")
+
+--- End of content from ./analysis\canvas_analyzer.py ---
+
+--- Start of content from ./analysis\human_placer.py ---
+
+# wplace_bot/analysis/human_placer.py
+from collections import defaultdict
+from typing import List, Tuple
+
+import numpy as np
+from sklearn.cluster import DBSCAN
+from scipy.spatial.distance import cdist
+
+def get_human_like_ordered_pixels(candidate_pixels: List[Tuple[float, int, int, int]], max_pixels: int) -> List[Tuple[int, int, int]]:
+    """
+    Orders a list of candidate pixels in a human-like manner by prioritizing larger clusters.
+    """
+    if not candidate_pixels or max_pixels == 0:
+        return []
+
+    pixels_by_color = defaultdict(list)
+    for _, gx, gy, cid in candidate_pixels:
+        pixels_by_color[cid].append((gx, gy))
+
+    all_clusters = []
+    for cid, coords in pixels_by_color.items():
+        if not coords: continue
+        if len(coords) < 2:
+            all_clusters.append({'cid': cid, 'coords': coords})
+            continue
+
+        coords_np = np.array(coords)
+        db = DBSCAN(eps=2, min_samples=2).fit(coords_np)
+        
+        clusters_by_label = defaultdict(list)
+        for i, label in enumerate(db.labels_):
+            clusters_by_label[label].append(coords[i])
+        
+        for label, cluster_coords in clusters_by_label.items():
+            if label == -1: # Noise points
+                for coord in cluster_coords:
+                    all_clusters.append({'cid': cid, 'coords': [coord]})
+            else:
+                all_clusters.append({'cid': cid, 'coords': cluster_coords})
+
+    all_clusters.sort(key=lambda c: len(c['coords']), reverse=True)
+    
+    final_ordered_pixels = []
+    for cluster in all_clusters:
+        if len(final_ordered_pixels) >= max_pixels: break
+        
+        path, remaining_coords = [], list(cluster['coords'])
+        current_point = remaining_coords.pop(0)
+        path.append(current_point)
+        
+        while remaining_coords:
+            distances = cdist([current_point], remaining_coords)
+            nearest_index = np.argmin(distances)
+            current_point = remaining_coords.pop(nearest_index)
+            path.append(current_point)
+        
+        for p in path:
+            if len(final_ordered_pixels) < max_pixels:
+                final_ordered_pixels.append((p[0], p[1], cluster['cid']))
+            else:
+                break
+                
+    return final_ordered_pixels
+
+--- End of content from ./analysis\human_placer.py ---
+
+--- Start of content from ./utils\color_helper.py ---
+
+# wplace_bot/utils/color_helper.py
+import numpy as np
+from wplace_bot.config import COLOR_PALETTE_JSON
+
+# Pre-process the palette for performance
+COLOR_PALETTE = [c['rgb'] for c in COLOR_PALETTE_JSON]
+FULL_PALETTE_NP = np.array(COLOR_PALETTE, dtype=np.uint8)
+
+def find_color_ids_with_alpha(rgba_array: np.ndarray) -> np.ndarray:
+    """
+    Finds the closest color ID for each pixel in an RGBA array, correctly
+    distinguishing between "Transparent" (0) and "Black" (1).
+    """
+    if rgba_array.ndim != 3 or rgba_array.shape[2] != 4:
+        raise ValueError("Input array must be a 3D RGBA numpy array.")
+
+    rgb_pixels = rgba_array[:, :, :3].reshape(-1, 3)
+    opaque_palette = FULL_PALETTE_NP[1:]
+
+    diff = rgb_pixels.astype(np.int64)[:, np.newaxis, :] - opaque_palette.astype(np.int64)[np.newaxis, :, :]
+    dist_sq = np.sum(diff ** 2, axis=2)
+    color_ids_flat = np.argmin(dist_sq, axis=1) + 1
+
+    color_ids = color_ids_flat.reshape(rgba_array.shape[0], rgba_array.shape[1])
+    color_ids[rgba_array[:, :, 3] < 128] = 0
+    
+    return color_ids
+
+--- End of content from ./utils\color_helper.py ---
+
+--- Start of content from ./utils\file_io.py ---
+
+# wplace_bot/utils/file_io.py
+import json
+import logging
+import time
+from pathlib import Path
+
+from typing import List, Dict, Any
+
+from wplace_bot.config import PROFILE_DATA_FILE, DATA_LOCK
+
+def save_profile_data(profile_name: str, charges: int, max_charges: int):
+    """Safely saves the charge data for a given profile to a JSON file."""
+    with DATA_LOCK:
+        data = load_profile_data() # Reuse loader to handle missing/corrupt file
+        data[profile_name] = {
+            "current_charges": charges,
+            "max_charges": max_charges,
+            "last_updated_timestamp": time.time()
+        }
+        try:
+            with open(PROFILE_DATA_FILE, 'w') as f:
+                json.dump(data, f, indent=4)
+            logging.info(f"Saved data for profile '{profile_name}': {charges}/{max_charges} charges.")
+        except IOError as e:
+            logging.error(f"Failed to write profile data to {PROFILE_DATA_FILE}: {e}")
+
+def load_profile_data() -> Dict[str, Any]:
+    """Loads profile data from the JSON file."""
+    if not Path(PROFILE_DATA_FILE).exists():
+        return {}
+    try:
+        with open(PROFILE_DATA_FILE, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        logging.warning(f"Could not read or parse '{PROFILE_DATA_FILE}'. Treating as empty.")
+        return {}
+
+def get_template_files(directory: str) -> List[Path]:
+    """Finds all .png template files in a given directory."""
+    template_dir = Path(directory)
+    if not template_dir.is_dir():
+        logging.warning(f"Template directory '{directory}' not found.")
+        return []
+    files = sorted(list(template_dir.glob("*.png")))
+    logging.info(f"Found {len(files)} templates in '{directory}'.")
+    return files
+
+--- End of content from ./utils\file_io.py ---
+
