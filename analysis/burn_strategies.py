@@ -131,8 +131,58 @@ class EnclosedComponentBurnStrategy(BurnStrategy):
                         ]
                         all_candidates.extend(global_coords)
 
-        print(f"EnclosedComponentBurnStrategy found {len(all_candidates)} candidates.")
+        logging.info(f"EnclosedComponentBurnStrategy found {len(all_candidates)} candidates.")
         return all_candidates
+
+
+class FixedTileBurnStrategy(BurnStrategy):
+    """
+    A strategy that targets all transparent pixels on a specific tile for burning.
+    This is useful for directing burn efforts to a single, known location.
+    """
+    def __init__(self, tile_x: int, tile_y: int, **kwargs):
+        super().__init__(**kwargs)
+        self.tile_x = tile_x
+        self.tile_y = tile_y
+        logging.info(f"Initialized FixedTileBurnStrategy for tile ({tile_x},{tile_y}).")
+
+    @staticmethod
+    def _fetch_tile_image(tx: int, ty: int, session: StealthSession) -> Image.Image | None:
+        """Fetches and returns a single tile image."""
+        url = f"https://backend.wplace.live/files/s0/tiles/{tx}/{ty}.png"
+        try:
+            response = session.get(url, timeout=10, retry=3)
+            response.raise_for_status()
+            return Image.open(io.BytesIO(response.content)).convert("RGBA")
+        except requests.RequestException as e:
+            logging.error(f"Failed to fetch tile ({tx},{ty}) for burn analysis: {e}")
+            return None
+
+    def analyze(self, session: StealthSession) -> List[Tuple[int, int]]:
+        """
+        Analyzes the configured tile to find all transparent pixels.
+        """
+        logging.info(f"Executing fixed tile burn analysis on tile ({self.tile_x}, {self.tile_y}).")
+        tile_image = self._fetch_tile_image(self.tile_x, self.tile_y, session)
+
+        if not tile_image:
+            logging.error("Could not retrieve tile image; aborting burn analysis.")
+            return []
+
+        color_ids = find_color_ids_with_alpha(np.array(tile_image))
+        
+        # Find all coordinates where the color ID is 0 (Transparent)
+        transparent_pixels = np.argwhere(color_ids == 0)
+        
+        # Convert local (py, px) to global (gx, gy) coordinates
+        # Note: argwhere returns (row, col) which corresponds to (y, x)
+        global_coords = [
+            (self.tile_x * 1000 + px, self.tile_y * 1000 + py)
+            for py, px in transparent_pixels
+        ]
+        
+        logging.info(f"FixedTileBurnStrategy found {len(global_coords)} transparent pixels.")
+        return global_coords
 
 
 # --- Strategy Mapping ---
@@ -142,5 +192,6 @@ class EnclosedComponentBurnStrategy(BurnStrategy):
 # 3. Add the class to this dictionary with a unique key.
 STRATEGY_MAPPING = {
     "enclosed_component": EnclosedComponentBurnStrategy,
+    "fixed_tile_burn": FixedTileBurnStrategy,
     # "another_strategy": AnotherStrategyClass,
 }

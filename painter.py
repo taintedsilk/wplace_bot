@@ -132,14 +132,15 @@ class WplacePainter:
     """
     Manages browser automation, user state, and network interactions with wplace.live.
     """
-    def __init__(self, pixel_queue: List[Tuple[float, int, int, int]], transparent_pixels: List[Tuple[int, int]], burn_candidates: List[Tuple[int, int]]):
+    def __init__(self, pixel_queue: List[Tuple[float, int, int, int]], transparent_pixels: List[Tuple[int, int]], burn_candidates: List[List[Tuple[int, int]]]):
         """
         Initializes the painter with pre-analyzed pixel data.
 
         Args:
             pixel_queue: A list of (priority, gx, gy, color_id) tuples to paint.
             transparent_pixels: A list of (gx, gy) tuples representing available transparent pixels.
-            burn_candidates: A list of (gx, gy) tuples for strategic charge burning.
+            burn_candidates: A list of lists, where each inner list contains (gx, gy)
+                             tuples from a specific burn strategy, in execution order.
         """
         self.paint_token: str | None = None
         self.browser: zd.Browser | None = None
@@ -339,26 +340,35 @@ class WplacePainter:
             logging.info(f"Selected {len(final_pixel_payload)} template pixels to paint.")
 
         # --- Charge Burning Logic ---
-        # Calculate remaining charges and burn all of them.
-        charges_after_paint = self.current_charges - len(final_pixel_payload)
-        num_to_burn = charges_after_paint
+        # Calculate remaining charges and burn all of them sequentially by strategy.
+        charges_left_to_burn = self.current_charges - len(final_pixel_payload)
         
-        if num_to_burn > 0:
-            logging.info(f"Will burn {num_to_burn} remaining charges.")
-            coords_to_paint_burn = []
+        if charges_left_to_burn > 0:
+            logging.info(f"Will burn {charges_left_to_burn} remaining charges.")
             
-            # --- STRATEGIC CHARGE BURNING ---
+            # --- STRATEGIC CHARGE BURNING (SEQUENTIAL) ---
             if self.burn_candidates:
-                num_added = min(num_to_burn, len(self.burn_candidates))
-                coords_to_paint_burn = random.sample(self.burn_candidates, num_added)
-                for gx, gy in coords_to_paint_burn:
-                    final_pixel_payload.append((gx, gy, 0)) # Color 0 is Transparent
-                logging.info(f"Added {num_added} pixels using pre-analyzed targeted burn strategy.")
-            
-            # Fallback if the strategic burn didn't use up all charges or wasn't available
-            remaining_to_burn = num_to_burn - len(coords_to_paint_burn)
-            if remaining_to_burn > 0 and self.available_transparent_pixels:
-                logging.info("Falling back to random transparent strategy for remaining burn.")
+                logging.info(f"Executing {len(self.burn_candidates)} burn strategies in order.")
+                for i, strategy_candidates in enumerate(self.burn_candidates):
+                    if charges_left_to_burn == 0:
+                        break # Stop if we've used all charges
+
+                    # Shuffle candidates within a single strategy to avoid painting in a straight line
+                    random.shuffle(strategy_candidates)
+                    
+                    num_to_take = min(charges_left_to_burn, len(strategy_candidates))
+                    
+                    if num_to_take > 0:
+                        pixels_from_this_strategy = strategy_candidates[:num_to_take]
+                        for gx, gy in pixels_from_this_strategy:
+                            final_pixel_payload.append((gx, gy, 0)) # Color 0 is Transparent
+                        
+                        charges_left_to_burn -= num_to_take
+                        logging.info(f"Added {num_to_take} pixels from burn strategy #{i+1}.")
+
+            # Fallback if strategic burns didn't use up all charges or weren't available
+            if charges_left_to_burn > 0 and self.available_transparent_pixels:
+                logging.info(f"Falling back to random transparent strategy for {charges_left_to_burn} remaining charge(s).")
                 
                 # Group transparent pixels by tile to place them in a concentrated area.
                 pixels_by_tile = defaultdict(list)
@@ -370,7 +380,7 @@ class WplacePainter:
                     best_tile = max(pixels_by_tile, key=lambda k: len(pixels_by_tile[k]))
                     fallback_burn_candidates = pixels_by_tile[best_tile]
                     
-                    num_added = min(remaining_to_burn, len(fallback_burn_candidates))
+                    num_added = min(charges_left_to_burn, len(fallback_burn_candidates))
                     coords_to_paint_fallback = random.sample(fallback_burn_candidates, num_added)
                     for gx, gy in coords_to_paint_fallback:
                         final_pixel_payload.append((gx, gy, 0))
@@ -551,10 +561,10 @@ class WplacePainter:
             tx, px = divmod(gx, 1000)
             ty, py = divmod(gy, 1000)
             pixel_js_array.append({
-                "tile": [tx, ty],
+                "tile": [int(tx), int(ty)],
                 "season": season,
                 "colorIdx": int(color_id),
-                "pixel": [px, py]
+                "pixel": [int(px), int(py)]
             })
 
         # --- Step 3: Get fingerprint ---

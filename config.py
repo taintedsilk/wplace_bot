@@ -15,9 +15,12 @@ DATA_LOCK = threading.Lock()
 RANDOM_TILE_CHECK_INTERVAL_SECONDS = 60
 
 # --- Charge Burning Strategy ---
-# Select the strategy for burning excess charges.
-# Set to None to disable strategic burning and fall back to random transparent pixels.
-BURN_STRATEGY = "enclosed_component"  # or None
+# A list of strategies to run sequentially for burning excess charges.
+# An empty list disables strategic burning, falling back to random transparent pixels.
+BURN_STRATEGIES = [
+    "fixed_tile_burn",
+    "enclosed_component"
+]
 
 # Configuration for specific strategies.
 BURN_STRATEGY_CONFIG = {
@@ -25,6 +28,10 @@ BURN_STRATEGY_CONFIG = {
         "tile_x": 1188,
         "tile_y": 720,
         "color_id": 27,  # Corresponds to "Dark Pink"
+    },
+    "fixed_tile_burn": {
+        "tile_x": 1662,
+        "tile_y": 946,
     }
     # "another_strategy": { "some_param": "some_value" }
 }
@@ -83,6 +90,12 @@ TEMPLATE_DIRECTORY = "templates"
 
 # List the names of the profile folders you want to run via the manager.
 PROFILES_TO_USE = [
+    "Profile 18",
+    "Profile 17",
+    "Profile 16",
+    "Profile 15",
+    "Profile 14",
+    "Profile 13",
     "Profile 12",
     "Profile 11",
     "Profile 10",

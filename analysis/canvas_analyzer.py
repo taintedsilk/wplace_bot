@@ -13,7 +13,7 @@ from PIL import Image
 from stealth_requests import StealthSession
 
 from wplace_bot.analysis.burn_strategies import STRATEGY_MAPPING
-from wplace_bot.config import BURN_STRATEGY, BURN_STRATEGY_CONFIG
+from wplace_bot.config import BURN_STRATEGIES, BURN_STRATEGY_CONFIG
 from wplace_bot.utils.color_helper import find_color_ids_with_alpha
 
 class CanvasAnalyzer:
@@ -22,7 +22,7 @@ class CanvasAnalyzer:
     def __init__(self):
         self.pixel_queue: List[Tuple[float, int, int, int]] = []
         self.available_transparent_pixels: List[Tuple[int, int]] = []
-        self.burn_candidates: List[Tuple[int, int]] = []
+        self.burn_candidates: List[List[Tuple[int, int]]] = []
 
     def needs_fixing(self) -> bool:
         """Returns True if the analysis found any pixels to paint."""
@@ -47,22 +47,37 @@ class CanvasAnalyzer:
 
     def analyze_burn_candidates(self):
         """
-        Initializes and runs the selected burn strategy from the config.
+        Initializes and runs all selected burn strategies from the config,
+        preserving the order of candidates from each strategy.
         """
-        if not BURN_STRATEGY or BURN_STRATEGY not in STRATEGY_MAPPING:
-            logging.info("No valid burn strategy selected in config. Skipping analysis.")
+        if not BURN_STRATEGIES:
+            logging.info("No burn strategies listed in config. Skipping analysis.")
             return
 
-        strategy_class = STRATEGY_MAPPING[BURN_STRATEGY]
-        strategy_config = BURN_STRATEGY_CONFIG.get(BURN_STRATEGY, {})
+        self.burn_candidates = []
+        total_candidates = 0
+        with StealthSession() as session:
+            for strategy_name in BURN_STRATEGIES:
+                if strategy_name not in STRATEGY_MAPPING:
+                    logging.warning(f"Burn strategy '{strategy_name}' not found in STRATEGY_MAPPING. Skipping.")
+                    continue
+
+                strategy_class = STRATEGY_MAPPING[strategy_name]
+                strategy_config = BURN_STRATEGY_CONFIG.get(strategy_name, {})
+                
+                try:
+                    logging.info(f"Executing burn strategy: '{strategy_name}'")
+                    strategy = strategy_class(**strategy_config)
+                    candidates = strategy.analyze(session)
+                    if candidates:
+                        # Add the list of candidates from this strategy as a new element
+                        self.burn_candidates.append(candidates)
+                        total_candidates += len(candidates)
+                        logging.info(f"Strategy '{strategy_name}' found {len(candidates)} candidates.")
+                except Exception as e:
+                    logging.error(f"Error executing burn strategy '{strategy_name}': {e}", exc_info=True)
         
-        try:
-            strategy = strategy_class(**strategy_config)
-            with StealthSession() as session:
-                self.burn_candidates = strategy.analyze(session)
-        except Exception as e:
-            logging.error(f"Error executing burn strategy '{BURN_STRATEGY}': {e}", exc_info=True)
-            self.burn_candidates = []
+        logging.info(f"Finished all burn analyses. Total candidates found: {total_candidates} across {len(self.burn_candidates)} strategies.")
 
 
     def _get_template_data(self, template_path: Path) -> Dict[str, Any]:
