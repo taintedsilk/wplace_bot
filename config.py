@@ -29,6 +29,11 @@ BURN_STRATEGY_CONFIG = {
     # "another_strategy": { "some_param": "some_value" }
 }
 
+PRIORITY_FIX_THRESHOLD_PERCENT = 5.0
+
+# The minimum number of charges a profile must have to be chosen for a priority run.
+# This prevents wasting a run with a profile that can only place a few pixels.
+PRIORITY_FIX_MIN_CHARGES = 100
 
 # --- wplace.live Constants ---
 COLOR_PALETTE_JSON = [
@@ -78,6 +83,8 @@ TEMPLATE_DIRECTORY = "templates"
 
 # List the names of the profile folders you want to run via the manager.
 PROFILES_TO_USE = [
+    "Profile 12",
+    "Profile 11",
     "Profile 10",
     "Profile 9", 
     "Profile 8", 

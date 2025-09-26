@@ -2,3 +2,8 @@ __pycache__/
 output.txt
 extract.py
 repomix-output.xml
+__pycache__/run_manager.cpython-310.pyc
+__pycache__/run_manager.cpython-310.pyc
+analysis/__pycache__/burn_strategies.cpython-310.pyc
+analysis/burn_strategies.py
+/__pycache__

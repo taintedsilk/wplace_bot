@@ -7,10 +7,14 @@ import random
 from pathlib import Path
 from typing import List, Dict, Any, Set
 
+import numpy as np
+from PIL import Image
+
 from wplace_bot.config import (
     PROFILE_DATA_FILE, CHARGE_GAIN_RATE_SECONDS, PROFILES_TO_USE,
     PROFILES_FOLDER, PROFILE_TIMEOUT_SECONDS, RUN_INTERVAL_SECONDS,
-    RANDOM_TILE_CHECK_INTERVAL_SECONDS, TEMPLATE_DIRECTORY, IDLE_CHECK_INTERVAL_SECONDS
+    RANDOM_TILE_CHECK_INTERVAL_SECONDS, TEMPLATE_DIRECTORY, IDLE_CHECK_INTERVAL_SECONDS,
+    PRIORITY_FIX_THRESHOLD_PERCENT, PRIORITY_FIX_MIN_CHARGES
 )
 from wplace_bot.utils.file_io import load_profile_data, get_template_files
 from wplace_bot.analysis.canvas_analyzer import CanvasAnalyzer
@@ -24,33 +28,48 @@ logging.basicConfig(
 
 # --- Shared State for Manager and Monitoring Thread ---
 templates_to_fix: Set[Path] = set()
+priority_templates_to_fix: Set[Path] = set()
 all_template_paths: List[Path] = []
 state_lock = threading.Lock()
 
-def check_template(template_path: Path) -> bool:
-    """Analyzes a single template and returns True if it needs fixing."""
+
+def check_template(template_path: Path) -> tuple[bool, bool]:
+    """
+    Analyzes a single template.
+    Returns:
+        A tuple (needs_fixing, is_priority).
+    """
     try:
         analyzer = CanvasAnalyzer()
         analyzer.analyze_templates([template_path])
-        return analyzer.needs_fixing()
+        
+        needs_fixing = analyzer.needs_fixing()
+        is_priority = False
+
+        if needs_fixing:
+            wrong_pixels_count = len(analyzer.pixel_queue)
+            
+            template_img = Image.open(template_path).convert("RGBA")
+            template_np = np.array(template_img)
+            total_pixels = np.sum(template_np[:, :, 3] > 128)
+
+            if total_pixels > 0:
+                percentage_wrong = (wrong_pixels_count / total_pixels) * 100
+                if percentage_wrong >= PRIORITY_FIX_THRESHOLD_PERCENT:
+                    is_priority = True
+                    logging.info(f"[Monitor] Template {template_path.name} is a PRIORITY fix ({percentage_wrong:.2f}% wrong).")
+        
+        return needs_fixing, is_priority
+
     except Exception as e:
         logging.error(f"[Monitor] Error analyzing template {template_path.name}: {e}")
-        return False
+        return False, False
+
 
 def canvas_monitoring_worker():
-    """
-    A worker thread that periodically checks the canvas state.
-    On start, it checks all templates. Then, it checks a random template periodically.
-    """
-    global templates_to_fix, all_template_paths
-    logging.info("[Monitor] Starting initial canvas scan of all templates...")
-    
-    initial_fix_list = [path for path in all_template_paths if check_template(path)]
-    
-    with state_lock:
-        templates_to_fix.update(initial_fix_list)
-        
-    logging.info(f"[Monitor] Initial scan complete. Found {len(templates_to_fix)} templates needing fixes.")
+    """A worker thread that periodically checks a random template on the canvas."""
+    global templates_to_fix, priority_templates_to_fix, all_template_paths
+    logging.info("[Monitor] Background monitoring worker started. Will perform periodic random checks.")
 
     while True:
         try:
@@ -61,18 +80,29 @@ def canvas_monitoring_worker():
             template_to_check = random.choice(all_template_paths)
             logging.info(f"[Monitor] Performing random check on: {template_to_check.name}")
             
-            needs_fixing = check_template(template_to_check)
+            needs_fixing, is_priority = check_template(template_to_check)
             
             with state_lock:
-                if needs_fixing and template_to_check not in templates_to_fix:
-                    logging.info(f"[Monitor] Found new template to fix: {template_to_check.name}")
-                    templates_to_fix.add(template_to_check)
-                elif not needs_fixing and template_to_check in templates_to_fix:
+                if needs_fixing:
+                    if template_to_check not in templates_to_fix:
+                        logging.info(f"[Monitor] Found new template to fix: {template_to_check.name}")
+                        templates_to_fix.add(template_to_check)
+                elif template_to_check in templates_to_fix:
                     logging.info(f"[Monitor] Template is now fixed, removing from queue: {template_to_check.name}")
                     templates_to_fix.remove(template_to_check)
 
+                if is_priority:
+                    if template_to_check not in priority_templates_to_fix:
+                        priority_templates_to_fix.add(template_to_check)
+                elif template_to_check in priority_templates_to_fix:
+                    priority_templates_to_fix.remove(template_to_check)
+                
+                if not needs_fixing and template_to_check in priority_templates_to_fix:
+                    priority_templates_to_fix.remove(template_to_check)
+
         except Exception as e:
             logging.error(f"[Monitor] An error occurred in the monitoring loop: {e}", exc_info=True)
+
 
 def calculate_profile_statuses(all_data: Dict[str, Any], profiles_to_run: List[str]) -> List[Dict[str, Any]]:
     """Calculates the current estimated charges and identifies profiles at full charge."""
@@ -101,7 +131,7 @@ def run_single_profile_script(profile_name: str, templates_to_fix_paths: List[Pa
     template_path_strs = [str(p.absolute()) for p in templates_to_fix_paths]
     command = [
         "python", "-m", "wplace_bot.run_single_profile", profile_name,
-        *template_path_strs, # Unpack the list of paths as arguments
+        *template_path_strs,
         "--profiles_folder", str(PROFILES_FOLDER),
     ]
     if templates_to_fix_paths:
@@ -112,10 +142,17 @@ def run_single_profile_script(profile_name: str, templates_to_fix_paths: List[Pa
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout, stderr = process.communicate(timeout=PROFILE_TIMEOUT_SECONDS)
         
+        # --- FIX 1: Combine stdout and stderr for complete logging ---
+        full_output = ""
+        if stdout:
+            full_output += f"Stdout:\n{stdout}\n"
+        if stderr:
+            full_output += f"Stderr:\n{stderr}\n"
+
         if process.returncode != 0:
-            logging.error(f"Subprocess for '{profile_name}' failed. Stderr:\n{stderr}")
+            logging.error(f"Subprocess for '{profile_name}' failed. Output:\n{full_output}")
         else:
-            logging.info(f"Subprocess for '{profile_name}' finished. Stdout:\n{stdout}")
+            logging.info(f"Subprocess for '{profile_name}' finished. Output:\n{full_output}")
             
     except subprocess.TimeoutExpired:
         logging.warning(f"Timeout exceeded for '{profile_name}'. Terminating...")
@@ -127,9 +164,10 @@ def run_single_profile_script(profile_name: str, templates_to_fix_paths: List[Pa
     except Exception as e:
         logging.critical(f"Error running subprocess for '{profile_name}': {e}", exc_info=True)
 
+
 def main_loop():
-    """Main loop to select and run profiles."""
-    global templates_to_fix
+    """Main loop to select and run profiles, prioritizing heavily damaged templates."""
+    global templates_to_fix, priority_templates_to_fix
 
     logging.info("--- Manager starting main operational loop ---")
     
@@ -137,28 +175,103 @@ def main_loop():
         logging.info("--- Starting new manager cycle ---")
         
         profile_data = load_profile_data()
+
+        known_profiles = set(profile_data.keys())
+        configured_profiles = set(PROFILES_TO_USE)
+        newly_added_profiles = configured_profiles - known_profiles
+
+        if newly_added_profiles:
+            logging.info(f"Found {len(newly_added_profiles)} new profile(s) to initialize: {', '.join(newly_added_profiles)}")
+            for new_profile_name in newly_added_profiles:
+                logging.info(f"Running initialization for new profile: '{new_profile_name}'")
+                run_single_profile_script(new_profile_name, [])
+                time.sleep(5)
+            
+            logging.info("Finished initializing new profiles. Cooling down before continuing.")
+            time.sleep(RUN_INTERVAL_SECONDS)
+            continue
+        
         statuses = calculate_profile_statuses(profile_data, PROFILES_TO_USE)
         
+        with state_lock:
+            priority_templates_for_run = list(priority_templates_to_fix)
+        
+        if priority_templates_for_run:
+            logging.warning(f"PRIORITY FIX DETECTED for {len(priority_templates_for_run)} template(s). Searching for an eligible profile.")
+            
+            eligible_profiles = [p for p in statuses if p["estimated_charges"] >= PRIORITY_FIX_MIN_CHARGES]
+            
+            if not eligible_profiles:
+                logging.warning(f"No profiles have enough charges (> {PRIORITY_FIX_MIN_CHARGES}) for a priority run. Waiting.")
+                time.sleep(IDLE_CHECK_INTERVAL_SECONDS)
+                continue
+
+            best_profile = max(eligible_profiles, key=lambda p: p["estimated_charges"])
+            profile_name = best_profile['name']
+            charges = best_profile['estimated_charges']
+            
+            logging.info(f"Dispatching profile '{profile_name}' ({int(charges)} charges) for PRIORITY run.")
+            run_single_profile_script(profile_name, priority_templates_for_run)
+            
+            # Add proactive re-check for priority runs
+            logging.info(f"Proactively re-checking {len(priority_templates_for_run)} priority template(s) after run.")
+            for template_path in priority_templates_for_run:
+                needs_fixing, is_priority = check_template(template_path)
+                with state_lock:
+                    if not needs_fixing:
+                        if template_path in templates_to_fix:
+                            logging.info(f"Confirmed fix for {template_path.name}, removing from main queue.")
+                            templates_to_fix.remove(template_path)
+                        if template_path in priority_templates_to_fix:
+                            logging.info(f"Confirmed fix for {template_path.name}, removing from priority queue.")
+                            priority_templates_to_fix.remove(template_path)
+                    else:
+                        logging.warning(f"Template {template_path.name} still needs fixing after priority run.")
+            
+            logging.info(f"--- Priority run dispatched. Waiting for {RUN_INTERVAL_SECONDS}s cooldown. ---")
+            time.sleep(RUN_INTERVAL_SECONDS)
+            continue
+
         full_profiles = [p for p in statuses if p["is_full"]]
         
         if not full_profiles:
-            logging.info(f"No profiles are at full charges. Checking again in {IDLE_CHECK_INTERVAL_SECONDS}s.")
-            time.sleep(IDLE_CHECK_INTERVAL_SECONDS)  # Short wait if idle
+            logging.info(f"No priority tasks and no profiles at full charge. Checking again in {IDLE_CHECK_INTERVAL_SECONDS}s.")
+            time.sleep(IDLE_CHECK_INTERVAL_SECONDS)
             continue
 
-        # If we have profiles at full charge, run them all.
-        logging.info(f"Found {len(full_profiles)} profile(s) at full charge. Preparing to run them.")
+        logging.info(f"Found {len(full_profiles)} profile(s) at full charge for regular run.")
         
-        with state_lock:
-            templates_for_run = list(templates_to_fix)
-
         for profile_to_run in full_profiles:
             profile_to_run_name = profile_to_run['name']
-            logging.info(f"Dispatching profile: '{profile_to_run_name}'")
-            run_single_profile_script(profile_to_run_name, templates_for_run)
-            time.sleep(5)  # Small delay between starting profiles
+            
+            # --- Get the current list of templates to fix for *this specific* run ---
+            current_templates_to_fix_for_this_profile = []
+            with state_lock:
+                current_templates_to_fix_for_this_profile = list(templates_to_fix) 
+
+            run_description = f"to fix {len(current_templates_to_fix_for_this_profile)} template(s)" if current_templates_to_fix_for_this_profile else "for a charge-burn run."
+            logging.info(f"Dispatching profile: '{profile_to_run_name}' {run_description}")
+            run_single_profile_script(profile_to_run_name, current_templates_to_fix_for_this_profile)
+
+            # --- FIX 2: Proactively re-check templates that were just targeted ---
+            if current_templates_to_fix_for_this_profile:
+                logging.info(f"Proactively re-checking {len(current_templates_to_fix_for_this_profile)} template(s) after run.")
+                for template_path in current_templates_to_fix_for_this_profile:
+                    needs_fixing, is_priority = check_template(template_path)
+                    with state_lock:
+                        if not needs_fixing:
+                            if template_path in templates_to_fix:
+                                logging.info(f"Confirmed fix for {template_path.name}, removing from main queue.")
+                                templates_to_fix.remove(template_path)
+                            if template_path in priority_templates_to_fix:
+                                logging.info(f"Confirmed fix for {template_path.name}, removing from priority queue.")
+                                priority_templates_to_fix.remove(template_path)
+                        else:
+                            logging.warning(f"Template {template_path.name} still needs fixing after run.")
+            
+            time.sleep(5)
         
-        logging.info(f"--- All full profiles have been dispatched. Waiting for {RUN_INTERVAL_SECONDS}s before next major cycle. ---")
+        logging.info(f"--- All full profiles dispatched. Waiting for {RUN_INTERVAL_SECONDS}s before next major cycle. ---")
         time.sleep(RUN_INTERVAL_SECONDS)
 
 
@@ -167,6 +280,16 @@ if __name__ == "__main__":
     if not all_template_paths:
         logging.warning(f"No templates found in '{TEMPLATE_DIRECTORY}'. The bot will run in charge-burn only mode.")
     
+    logging.info("[Manager] Performing initial canvas scan of all templates...")
+    for path in all_template_paths:
+        needs_fixing, is_priority = check_template(path)
+        if needs_fixing:
+            with state_lock:
+                templates_to_fix.add(path)
+                if is_priority:
+                    priority_templates_to_fix.add(path)
+    logging.info(f"[Manager] Initial scan complete. Found {len(templates_to_fix)} templates needing fixes ({len(priority_templates_to_fix)} are priority).")
+
     monitor_thread = threading.Thread(target=canvas_monitoring_worker, daemon=True)
     monitor_thread.start()
     
