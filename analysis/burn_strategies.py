@@ -1,6 +1,7 @@
 # wplace_bot/analysis/burn_strategies.py
 import io
 import logging
+import random
 from typing import List, Tuple, Set
 
 import numpy as np
@@ -135,16 +136,18 @@ class EnclosedComponentBurnStrategy(BurnStrategy):
         return all_candidates
 
 
-class FixedTileBurnStrategy(BurnStrategy):
+
+class RandomTileInRadiusBurnStrategy(BurnStrategy):
     """
-    A strategy that targets all transparent pixels on a specific tile for burning.
-    This is useful for directing burn efforts to a single, known location.
+    A strategy that targets all transparent pixels on a randomly selected tile
+    within a specified radius of a center point.
     """
-    def __init__(self, tile_x: int, tile_y: int, **kwargs):
+    def __init__(self, center_tile_x: int, center_tile_y: int, radius: int, **kwargs):
         super().__init__(**kwargs)
-        self.tile_x = tile_x
-        self.tile_y = tile_y
-        logging.info(f"Initialized FixedTileBurnStrategy for tile ({tile_x},{tile_y}).")
+        self.center_x = center_tile_x
+        self.center_y = center_tile_y
+        self.radius = radius
+        logging.info(f"Initialized RandomTileInRadiusBurnStrategy around ({self.center_x},{self.center_y}) with radius {self.radius}.")
 
     @staticmethod
     def _fetch_tile_image(tx: int, ty: int, session: StealthSession) -> Image.Image | None:
@@ -158,12 +161,32 @@ class FixedTileBurnStrategy(BurnStrategy):
             logging.error(f"Failed to fetch tile ({tx},{ty}) for burn analysis: {e}")
             return None
 
+    def _get_random_tile_in_radius(self) -> Tuple[int, int]:
+        """Calculates and returns a random tile within the specified radius."""
+        candidate_tiles = []
+        radius_sq = self.radius ** 2
+        
+        # Iterate over the bounding box of the circle
+        for tx in range(self.center_x - self.radius, self.center_x + self.radius + 1):
+            for ty in range(self.center_y - self.radius, self.center_y + self.radius + 1):
+                # Check if the tile is within the circle using squared Euclidean distance
+                dist_sq = (tx - self.center_x)**2 + (ty - self.center_y)**2
+                if dist_sq < radius_sq:
+                    candidate_tiles.append((tx, ty))
+        
+        if not candidate_tiles:
+            logging.warning("No candidate tiles found in radius. Defaulting to center tile.")
+            return (self.center_x, self.center_y)
+            
+        return random.choice(candidate_tiles)
+
     def analyze(self, session: StealthSession) -> List[Tuple[int, int]]:
         """
-        Analyzes the configured tile to find all transparent pixels.
+        Analyzes a random tile within the radius to find all transparent pixels.
         """
-        logging.info(f"Executing fixed tile burn analysis on tile ({self.tile_x}, {self.tile_y}).")
-        tile_image = self._fetch_tile_image(self.tile_x, self.tile_y, session)
+        target_tile_x, target_tile_y = self._get_random_tile_in_radius()
+        logging.info(f"Executing random tile burn analysis on tile ({target_tile_x}, {target_tile_y}).")
+        tile_image = self._fetch_tile_image(target_tile_x, target_tile_y, session)
 
         if not tile_image:
             logging.error("Could not retrieve tile image; aborting burn analysis.")
@@ -177,11 +200,11 @@ class FixedTileBurnStrategy(BurnStrategy):
         # Convert local (py, px) to global (gx, gy) coordinates
         # Note: argwhere returns (row, col) which corresponds to (y, x)
         global_coords = [
-            (self.tile_x * 1000 + px, self.tile_y * 1000 + py)
+            (target_tile_x * 1000 + px, target_tile_y * 1000 + py)
             for py, px in transparent_pixels
         ]
         
-        logging.info(f"FixedTileBurnStrategy found {len(global_coords)} transparent pixels.")
+        logging.info(f"RandomTileInRadiusBurnStrategy found {len(global_coords)} transparent pixels on tile ({target_tile_x}, {target_tile_y}).")
         return global_coords
 
 
@@ -192,6 +215,6 @@ class FixedTileBurnStrategy(BurnStrategy):
 # 3. Add the class to this dictionary with a unique key.
 STRATEGY_MAPPING = {
     "enclosed_component": EnclosedComponentBurnStrategy,
-    "fixed_tile_burn": FixedTileBurnStrategy,
+    "random_tile_in_radius_burn": RandomTileInRadiusBurnStrategy,
     # "another_strategy": AnotherStrategyClass,
 }

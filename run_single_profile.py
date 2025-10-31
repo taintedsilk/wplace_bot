@@ -40,7 +40,7 @@ async def process_profile(args):
         analyzer = CanvasAnalyzer()
         analyzer.analyze_templates(templates_to_analyze)
         analyzer.analyze_burn_candidates()
-
+        
         if not analyzer.pixel_queue:
             if templates_to_analyze:
                 logging.info("Re-analysis shows no pixels need fixing across target templates. Will proceed to burn charges if any.")

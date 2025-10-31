@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 import numpy as np
 from sklearn.cluster import DBSCAN
-from scipy.spatial.distance import cdist
+from scipy.spatial.distance import cdist # No longer needed for pathing, but kept for potential future use
 
 def get_human_like_ordered_pixels(candidate_pixels: List[Tuple[float, int, int, int]], max_pixels: int) -> List[Tuple[int, int, int]]:
     """
@@ -44,15 +44,11 @@ def get_human_like_ordered_pixels(candidate_pixels: List[Tuple[float, int, int, 
     for cluster in all_clusters:
         if len(final_ordered_pixels) >= max_pixels: break
         
-        path, remaining_coords = [], list(cluster['coords'])
-        current_point = remaining_coords.pop(0)
-        path.append(current_point)
-        
-        while remaining_coords:
-            distances = cdist([current_point], remaining_coords)
-            nearest_index = np.argmin(distances)
-            current_point = remaining_coords.pop(nearest_index)
-            path.append(current_point)
+        # --- START OF CHANGE ---
+        # The O(N^2) nearest-neighbor pathfinding is replaced with a simple
+        # and fast O(N log N) spatial sort.
+        path = sorted(cluster['coords'], key=lambda p: (p[1], p[0])) # Sort by Y, then X
+        # --- END OF CHANGE ---
         
         for p in path:
             if len(final_ordered_pixels) < max_pixels:

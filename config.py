@@ -18,21 +18,27 @@ RANDOM_TILE_CHECK_INTERVAL_SECONDS = 60
 # A list of strategies to run sequentially for burning excess charges.
 # An empty list disables strategic burning, falling back to random transparent pixels.
 BURN_STRATEGIES = [
-    "fixed_tile_burn",
-    "enclosed_component"
+    # "fixed_tile_burn",
+    "random_tile_in_radius_burn",
+    # "enclosed_component"
 ]
 
 # Configuration for specific strategies.
 BURN_STRATEGY_CONFIG = {
-    "enclosed_component": {
-        "tile_x": 1188,
-        "tile_y": 720,
-        "color_id": 27,  # Corresponds to "Dark Pink"
+    # "enclosed_component": {
+    #     "tile_x": 1188,
+    #     "tile_y": 720,
+    #     "color_id": 27,  # Corresponds to "Dark Pink"
+    # },
+    # "fixed_tile_burn": {
+    #     "tile_x": 1662,
+    #     "tile_y": 946,
+    # }
+    "random_tile_in_radius_burn": {
+        "center_tile_x": 1631,
+        "center_tile_y": 904,
+        "radius": 20,
     },
-    "fixed_tile_burn": {
-        "tile_x": 1662,
-        "tile_y": 946,
-    }
     # "another_strategy": { "some_param": "some_value" }
 }
 
@@ -93,18 +99,18 @@ PROFILES_TO_USE = [
     "Profile 18",
     "Profile 17",
     "Profile 16",
-    "Profile 15",
-    "Profile 14",
+    # "Profile 15",
+    # "Profile 14",
     "Profile 13",
     "Profile 12",
-    "Profile 11",
+    # "Profile 11", CHECK LATER
     "Profile 10",
     "Profile 9", 
     "Profile 8", 
     "Profile 7", 
     "Profile 6", 
     "Profile 5",
-    "Profile 4", 
+    # "Profile 4", 
     "Profile 3", 
     "Profile 2",
     "Profile 1"

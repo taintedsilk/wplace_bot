@@ -142,7 +142,6 @@ def run_single_profile_script(profile_name: str, templates_to_fix_paths: List[Pa
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout, stderr = process.communicate(timeout=PROFILE_TIMEOUT_SECONDS)
         
-        # --- FIX 1: Combine stdout and stderr for complete logging ---
         full_output = ""
         if stdout:
             full_output += f"Stdout:\n{stdout}\n"
@@ -199,36 +198,60 @@ def main_loop():
         if priority_templates_for_run:
             logging.warning(f"PRIORITY FIX DETECTED for {len(priority_templates_for_run)} template(s). Searching for an eligible profile.")
             
-            eligible_profiles = [p for p in statuses if p["estimated_charges"] >= PRIORITY_FIX_MIN_CHARGES]
+            eligible_profiles = []
+            for p in statuses:
+                max_c = p['max_charges']
+                # For priority runs, the charge threshold is dynamic:
+                # - If max charges >= 200, wait for 50% of max charges.
+                # - If 100 <= max charges < 200, wait for 100 charges.
+                # - If max charges < 100, wait for max charges.
+                threshold = max(0.5 * max_c, min(max_c, PRIORITY_FIX_MIN_CHARGES))
+                if p['estimated_charges'] >= threshold:
+                    eligible_profiles.append(p)
             
             if not eligible_profiles:
-                logging.warning(f"No profiles have enough charges (> {PRIORITY_FIX_MIN_CHARGES}) for a priority run. Waiting.")
+                logging.warning(f"No profiles meet the dynamic charge threshold for a priority run. Waiting.")
                 time.sleep(IDLE_CHECK_INTERVAL_SECONDS)
                 continue
 
-            best_profile = max(eligible_profiles, key=lambda p: p["estimated_charges"])
-            profile_name = best_profile['name']
-            charges = best_profile['estimated_charges']
+            eligible_profiles.sort(key=lambda p: p["estimated_charges"], reverse=True)
             
-            logging.info(f"Dispatching profile '{profile_name}' ({int(charges)} charges) for PRIORITY run.")
-            run_single_profile_script(profile_name, priority_templates_for_run)
-            
-            # Add proactive re-check for priority runs
-            logging.info(f"Proactively re-checking {len(priority_templates_for_run)} priority template(s) after run.")
-            for template_path in priority_templates_for_run:
-                needs_fixing, is_priority = check_template(template_path)
+            for profile_to_run in eligible_profiles:
                 with state_lock:
-                    if not needs_fixing:
-                        if template_path in templates_to_fix:
-                            logging.info(f"Confirmed fix for {template_path.name}, removing from main queue.")
-                            templates_to_fix.remove(template_path)
-                        if template_path in priority_templates_to_fix:
-                            logging.info(f"Confirmed fix for {template_path.name}, removing from priority queue.")
+                    if not priority_templates_to_fix:
+                        logging.info("Priority queue was cleared before this profile could run. Ending priority cycle.")
+                        break
+                    templates_for_this_run = list(priority_templates_to_fix)
+                
+                profile_name = profile_to_run['name']
+                charges = profile_to_run['estimated_charges']
+                
+                logging.info(f"Dispatching profile '{profile_name}' ({int(charges)} charges) for PRIORITY run.")
+                run_single_profile_script(profile_name, templates_for_this_run)
+                time.sleep(5) 
+
+                # --- FIX: Proactive re-check AFTER EACH profile run ---
+                logging.info(f"Proactively re-checking {len(templates_for_this_run)} priority template(s) after run by '{profile_name}'.")
+                for template_path in templates_for_this_run:
+                    needs_fixing, is_priority = check_template(template_path)
+                    with state_lock:
+                        if not needs_fixing:
+                            if template_path in templates_to_fix:
+                                logging.info(f"Confirmed fix for {template_path.name}, removing from main queue.")
+                                templates_to_fix.remove(template_path)
+                            if template_path in priority_templates_to_fix:
+                                logging.info(f"Confirmed fix for {template_path.name}, removing from priority queue.")
+                                priority_templates_to_fix.remove(template_path)
+                        elif not is_priority and template_path in priority_templates_to_fix:
+                            logging.info(f"Template {template_path.name} is no longer a priority, removing from priority queue.")
                             priority_templates_to_fix.remove(template_path)
-                    else:
-                        logging.warning(f"Template {template_path.name} still needs fixing after priority run.")
+
+                with state_lock:
+                    if not priority_templates_to_fix:
+                        logging.info("All priority templates have been fixed. Ending priority dispatch cycle.")
+                        break # Exit the for-loop dispatching more profiles
             
-            logging.info(f"--- Priority run dispatched. Waiting for {RUN_INTERVAL_SECONDS}s cooldown. ---")
+            logging.info(f"--- Priority cycle finished. Waiting for {RUN_INTERVAL_SECONDS}s cooldown. ---")
             time.sleep(RUN_INTERVAL_SECONDS)
             continue
 
@@ -244,8 +267,6 @@ def main_loop():
         for profile_to_run in full_profiles:
             profile_to_run_name = profile_to_run['name']
             
-            # --- Get the current list of templates to fix for *this specific* run ---
-            current_templates_to_fix_for_this_profile = []
             with state_lock:
                 current_templates_to_fix_for_this_profile = list(templates_to_fix) 
 
@@ -253,11 +274,10 @@ def main_loop():
             logging.info(f"Dispatching profile: '{profile_to_run_name}' {run_description}")
             run_single_profile_script(profile_to_run_name, current_templates_to_fix_for_this_profile)
 
-            # --- FIX 2: Proactively re-check templates that were just targeted ---
             if current_templates_to_fix_for_this_profile:
                 logging.info(f"Proactively re-checking {len(current_templates_to_fix_for_this_profile)} template(s) after run.")
                 for template_path in current_templates_to_fix_for_this_profile:
-                    needs_fixing, is_priority = check_template(template_path)
+                    needs_fixing, _ = check_template(template_path)
                     with state_lock:
                         if not needs_fixing:
                             if template_path in templates_to_fix:

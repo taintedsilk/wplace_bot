@@ -1,4 +1,3 @@
-
 import asyncio
 import base64
 import json
@@ -24,12 +23,6 @@ from wplace_bot.config import (
     COLOR_PALETTE, COLOR_PALETTE_JSON,
 )
 
-logging.basicConfig(
-    filename='wplace_painter.log',
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filemode='w'
-)
 
 class BrowserInteractionError(Exception):
     """Custom exception for critical browser failures that should terminate the session."""
@@ -55,13 +48,14 @@ def find_closing_brace(text: str, start_index: int) -> int:
                 return i
     return -1
 
-def expose_paint_function(body_str: str) -> tuple[str, str | None]:
+def expose_paint_function(body_str: str, script_name: str) -> tuple[str, str | None]:
     """
     Dynamically and safely finds the paint function, its class, and its instance,
     then injects code to expose it on the window object.
     
     Args:
         body_str (str): The string containing the minified JavaScript code.
+        script_name (str): The name of the script being analyzed, for logging.
         
     Returns:
         tuple[str, str | None]: A tuple containing:
@@ -124,7 +118,7 @@ def expose_paint_function(body_str: str) -> tuple[str, str | None]:
     
     modified_body_str = body_str.replace(full_instantiation_line, replacement_block, 1)
 
-    logging.info(f"[+] Exposed paint function '{instance_name}.paint' as 'window.exposedPaintFunction'")
+    logging.info(f"[+] Exposed paint function '{instance_name}.paint' as 'window.exposedPaintFunction' from '{script_name}'")
     
     return modified_body_str, paint_func_name_from_match
 
@@ -142,7 +136,6 @@ class WplacePainter:
             burn_candidates: A list of lists, where each inner list contains (gx, gy)
                              tuples from a specific burn strategy, in execution order.
         """
-        self.paint_token: str | None = None
         self.browser: zd.Browser | None = None
         self.page: zd.Tab | None = None
         self.user_data: Dict[str, Any] | None = None
@@ -185,6 +178,7 @@ class WplacePainter:
             active_requests_count += 1
             request_id = event.request_id
             try:
+                script_name = event.request.url.split('/')[-1].split('?')[0]
                 if event.response_status_code is None or event.resource_type != cdp.network.ResourceType.SCRIPT:
                     await self.page.send(cdp.fetch.continue_request(request_id=request_id))
                     return
@@ -201,13 +195,14 @@ class WplacePainter:
                     if fp_match:
                         fingerprint_func_name = fp_match.group(1)
                         modified_body_str += f"\n;window.getFingerprint = {fingerprint_func_name};\n"
-                        logging.info(f"[+] Exposed fingerprint function as 'window.getFingerprint'")
+                        logging.info(f"[+] Found fingerprint function '{fingerprint_func_name}'")
+                        logging.info(f"[+] Exposed fingerprint function as 'window.getFingerprint' in '{script_name}'")
                         fingerprint_func_found.set_result(True)
                 
                 # --- MODIFIED BLOCK: Use the new robust function for paint ---
                 if not paint_func_found.done():
                     # The new function handles both finding and modifying the body
-                    modified_body_str, found_name = expose_paint_function(modified_body_str)
+                    modified_body_str, found_name = expose_paint_function(modified_body_str, script_name)
                     if found_name:
                         paint_func_name = found_name
                         paint_func_found.set_result(True)
@@ -472,120 +467,105 @@ class WplacePainter:
             
         return False # No purchase was attempted
 
+
     async def _execute_paint_requests(self, pixels_to_paint: List[Tuple[int, int, int]]) -> int:
         """
-        Captures a paint token via network interception and then uses the exposed JS 
-        paint function to paint pixels.
+        Retrieves the fingerprint with a retry mechanism, simulates user interaction,
+        and then uses the exposed JS function to paint the actual batch of pixels.
         """
         if not self.page or not pixels_to_paint:
             return 0
 
-        # --- Step 1: Capture a valid paint token by simulating a single UI paint ---
-        captured_data_future: asyncio.Future[Dict[str, Any]] = asyncio.Future()
+        # --- Step 1: Get fingerprint with robust retry logic ---
+                # --- Step 1: Get fingerprint with robust retry logic ---
+        fp = None
+        # Increased timeout to 20 seconds total, which is more realistic for fingerprinting
+        max_retries = 40
+        retry_interval = 1
+        js_fp_expr = "(async () => await window.getFingerprint())()"
+
+        logging.info("Attempting to retrieve fingerprint with robust polling...")
+        for attempt in range(max_retries):
+            try:
+                raw_fp_obj = await self.page.evaluate(js_fp_expr, await_promise=True)
+                
+                # Use the helper to safely get the value
+                candidate_fp = raw_fp_obj
+
+                # --- CRITICAL DEBUGGING STEP ---
+                # Log what we receive on each attempt to see the progress.
+                logging.debug(f"Fingerprint retrieval attempt {attempt + 1}: Received '{str(candidate_fp)[:100]}'")
+
+                if isinstance(candidate_fp, str) and candidate_fp:
+                    fp = candidate_fp
+                    logging.info(f"Successfully retrieved fingerprint after {attempt + 1} attempt(s): {fp[:20]}...")
+                    break  # Success, exit the loop
+            
+            except Exception as e:
+                # This catches errors in the JS execution itself
+                logging.warning(f"Exception during fingerprint retrieval attempt {attempt + 1}: {e}")
+
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_interval)
+        
+        if not fp:
+            logging.error("Failed to retrieve fingerprint after all retries. The function may have returned null/undefined.")
+            raise BrowserInteractionError("Failed to retrieve fingerprint after multiple attempts.")
+        
+        # --- Step 2: Simulate a UI paint and block the request to avoid wasting a charge ---
+        ui_paint_blocked_future: asyncio.Future[bool] = asyncio.Future()
 
         async def on_paint_request_paused(event: cdp.fetch.RequestPaused):
             if "backend.wplace.live/s0/pixel/" in event.request.url and event.request.method == 'POST':
-                if captured_data_future.done():
+                if not ui_paint_blocked_future.done():
                     try:
-                        await self.page.send(cdp.fetch.fail_request(request_id=event.request_id, error_reason=cdp.network.ErrorReason.ABORTED))
-                    except Exception: pass
-                    return
+                        await self.page.send(cdp.fetch.fail_request(
+                            request_id=event.request_id,
+                            error_reason=cdp.network.ErrorReason.ABORTED
+                        ))
+                        ui_paint_blocked_future.set_result(True)
+                    except Exception as e:
+                        if not ui_paint_blocked_future.done(): ui_paint_blocked_future.set_exception(e)
+                return
 
-                try:
-                    # Capture the request body which contains the token.
-                    captured_data_future.set_result({'body': event.request.post_data})
-                    # Fulfill with a dummy response to prevent the UI from erroring out.
-                    dummy_response_body = base64.b64encode(b'{"status":"ok"}').decode('ascii')
-                    await self.page.send(cdp.fetch.fulfill_request(
-                        request_id=event.request_id, response_code=200, body=dummy_response_body
-                    ))
-                except Exception as e:
-                    if not captured_data_future.done():
-                        captured_data_future.set_exception(e)
-            else:
-                try:
-                    await self.page.send(cdp.fetch.continue_request(request_id=event.request_id))
-                except Exception as e:
-                    logging.warning(f"Failed to continue request ({event.request.url}): {e}")
+            try:
+                if not self.page.closed: await self.page.send(cdp.fetch.continue_request(request_id=event.request_id))
+            except Exception: pass
 
-        await self.page.send(cdp.fetch.enable(patterns=[
-            cdp.fetch.RequestPattern(request_stage=cdp.fetch.RequestStage.REQUEST)
-        ]))
+        await self.page.send(cdp.fetch.enable())
         self.page.add_handler(cdp.fetch.RequestPaused, on_paint_request_paused)
-        
+
         try:
-            logging.info("Network interception enabled. Triggering UI paint action to capture token...")
+            logging.info("Simulating UI paint action to appear more human...")
             await (await self.page.select(r'div[class*="bottom-3"] button.btn-primary:not(:disabled)')).click()
             await (await self.page.select("#color-0")).click()
             await (await self.page.select("canvas.maplibregl-canvas")).click()
             paint_button_selector = 'div[class*="left-1/2"] button.btn-primary:not(:disabled)'
-            logging.info(f"Waiting for paint button '{paint_button_selector}' to become enabled...")
-
-            timeout = 30
-            timeout_start = asyncio.get_event_loop().time()
-            while asyncio.get_event_loop().time() < timeout_start + timeout:
-                try:
-                    paint_button = await self.page.select(paint_button_selector, timeout=1)
-                    logging.info("Paint button is enabled. Clicking now.")
-                    await paint_button.click()
-                    break
-                except asyncio.TimeoutError:
-                    logging.error(f"Timeout waiting for paint button. Checking for CF challenge.")
-                    try:
-                        await self.page.verify_cf(click_delay=0.25, timeout=1)
-                    except Exception as cf_e:
-                        logging.error(f"Failed to solve Cloudflare challenge: {cf_e}")
-            
-            captured_data = await asyncio.wait_for(captured_data_future, timeout=15)
-            
-            if not captured_data or not captured_data.get('body'):
-                raise ValueError("Interception succeeded but captured no post data.")
-
-            self.paint_token = json.loads(captured_data['body']).get('t')
-            if not self.paint_token:
-                raise ValueError("Token not found in intercepted data.")
-
-            logging.info(f"Successfully captured paint token: {self.paint_token[:10]}...")
+            logging.info(f"Waiting for final paint button to become enabled...")
+            paint_button = await self.page.select(paint_button_selector, timeout=15)
+            await paint_button.click()
+            await asyncio.wait_for(ui_paint_blocked_future, timeout=15)
+            logging.info("UI paint request successfully intercepted and blocked.")
         except Exception as e:
-            logging.error(f"Error during token capture: {e}", exc_info=True)
-            raise BrowserInteractionError("Failed to capture paint token.") from e
+            logging.error(f"Error during simulated UI interaction: {e}", exc_info=True)
+            raise BrowserInteractionError("Failed to simulate UI paint click.") from e
         finally:
             self.page.remove_handlers(cdp.fetch.RequestPaused, on_paint_request_paused)
-            await self.page.send(cdp.fetch.disable())
-            logging.info("Network interception disabled.")
-            
-        # --- Step 2: Prepare data for the exposed paint function ---
+            if not self.page.closed: await self.page.send(cdp.fetch.disable())
+            logging.info("Network interception for UI simulation disabled.")
+
+        # --- Step 3: Prepare data for the real paint call ---
         pixel_js_array = []
-        season = 0  # s0 is the current season
+        season = 0
         for gx, gy, color_id in pixels_to_paint:
             tx, px = divmod(gx, 1000)
             ty, py = divmod(gy, 1000)
             pixel_js_array.append({
-                "tile": [int(tx), int(ty)],
-                "season": season,
-                "colorIdx": int(color_id),
-                "pixel": [int(px), int(py)]
+                "tile": [int(tx), int(ty)], "season": season,
+                "colorIdx": int(color_id), "pixel": [int(px), int(py)]
             })
 
-        # --- Step 3: Get fingerprint ---
-        try:
-            # The exposed getFingerprint function returns the visitorId string directly.
-            js_fp_expr = "(async () => await window.getFingerprint())()"
-            raw_fp_obj = await self.page.evaluate(js_fp_expr, await_promise=True)
-            fp = raw_fp_obj
-            if isinstance(fp, tuple):
-                fp = fp[0].value if fp[0] else None
-            elif hasattr(fp, 'value'):
-                fp = fp.value
-            
-            if not isinstance(fp, str):
-                raise TypeError(f"Expected string from fingerprint, got {type(fp)}")
-            logging.info(f"Retrieved fingerprint: {fp[:20]}...")
-        except Exception as e:
-            logging.error(f"Failed to get fingerprint: {e}", exc_info=True)
-            raise BrowserInteractionError("Failed to retrieve fingerprint.") from e
-
-        # --- Step 4: Call the exposed paint function ---
+        # --- Step 4: Call the exposed paint function with the now-valid fingerprint ---
         successful_pixels = 0
         try:
             pixel_data_json = json.dumps(pixel_js_array)
@@ -593,13 +573,8 @@ class WplacePainter:
             (async () => {{
                 try {{
                     const pixels = {pixel_data_json};
-                    const token = {json.dumps(self.paint_token)};
                     const fingerprint = {json.dumps(fp)};
-                    
-                    // The original JS paint function does not return anything on success, but throws on error.
-                    await window.exposedPaintFunction(pixels, token, fingerprint);
-                    
-                    // If it doesn't throw, we assume success for all pixels.
+                    await window.exposedPaintFunction(pixels, fingerprint);
                     return {{ "ok": true, "count": {len(pixels_to_paint)} }};
                 }} catch (e) {{
                     return {{ "ok": false, "error": e.stack || e.toString() }};
@@ -607,20 +582,21 @@ class WplacePainter:
             }})();
             """
             result_obj = await self.page.evaluate(js_code, await_promise=True)
-            
-            result = result_obj
-            if isinstance(result, tuple):
-                result = result[0].value if result[0] else None
-            elif hasattr(result, 'value'):
-                result = result.value
+            result = None
+            if isinstance(result_obj, tuple) and result_obj and hasattr(result_obj[0], 'value'):
+                result = result_obj[0].value
+            elif hasattr(result_obj, 'value'):
+                result = result_obj.value
+            else:
+                result = result_obj
 
             if result and result.get("ok"):
                 successful_pixels = result.get("count", 0)
                 logging.info(f"Successfully painted {successful_pixels} pixels via exposed function.")
             else:
+                logging.error(f"Failed to paint pixels via exposed function. {result}")
                 error_msg = result.get('error') if result else "Unknown error"
                 logging.error(f"Paint via exposed function failed with JS error: {error_msg}")
-
         except Exception as e:
             logging.error(f"Failed to execute paint via exposed function: {e}", exc_info=True)
         
